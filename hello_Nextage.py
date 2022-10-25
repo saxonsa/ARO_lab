@@ -12,9 +12,8 @@ abs_path = os.path.dirname(os.path.realpath(__file__))
 root_path = abs_path
 core_path = root_path + '/core'
 sys.path.append(core_path)
-from Pybullet_Simulation_template import Simulation_template
-from Pybullet_Simulation import Simulation
 
+from core.Pybullet_Simulation import Simulation
 
 pybulletConfigs = {
     "simulation": bullet_simulation,
@@ -38,16 +37,10 @@ robotConfigs = {
     "colored": True          # Ture | False
 }
 
-# sim = Simulation_template(pybulletConfigs, robotConfigs)
-# print(sim.joints)
-
 sim = Simulation(pybulletConfigs, robotConfigs)
-print(sim.joints)
 
-
-j_geo2 = sim.jacobianMatrix(endEffector='LARM_JOINT5')
-print('our')
-print(j_geo2)
+geo_jacobian = sim.jacobianMatrix(endEffector='LARM_JOINT5')
+print(geo_jacobian)
 
 try:
     time.sleep(float(sys.argv[1]))
