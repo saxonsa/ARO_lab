@@ -97,6 +97,8 @@ class Simulation(Simulation_base):
 
     plot_time = []
     plot_distance = []
+    plot_time_dp = []
+    plot_distance_dp = []
 
     def getJointRotationalMatrix(self, jointName=None, theta=None):
         """
@@ -299,6 +301,7 @@ kukaId
                     i += 1
                     
                 self.tick_without_PD(endEffector)
+                print(np.linalg.norm(eff_pos - targetPosition))
                 
                 eff_pos = self.getJointPosition(jointName=endEffector).T[0]
 
@@ -361,7 +364,7 @@ kukaId
             u(t) - the manipulation signal
         """
         # TODO: Add your code here
-        u = kp * (x_ref - x_real) - kd * (dx_ref - dx_real)
+        u = kp * (x_ref - x_real) + kd * (dx_ref - dx_real)
 
         return u
 
@@ -415,14 +418,16 @@ kukaId
             # -------
             targetPosition, targetVelocity = float(targetPosition), float(targetVelocity)
 
+            # disable joint velocity controller before apply a torque
+            self.disableVelocityController(joint)
+
             # manually added here ----
-            toy_tick(targetPosition, x_real, targetVelocity, dx_real, 0)
+            toy_tick(targetPosition, x_real, targetVelocity, dx_real, integral=0)
             # -------
 
         pltTime = np.arange(1000) * self.dt
 
-        # disable joint velocity controller before apply a torque
-        self.disableVelocityController(joint)
+
         # logging for the graph
         pltTime, pltTarget, pltTorque, pltTorqueTime, pltPosition, pltVelocity = \
         pltTime, x_target, pltTorque, pltTime, x_list, x_velocity
@@ -430,7 +435,7 @@ kukaId
         return pltTime, pltTarget, pltTorque, pltTorqueTime, pltPosition, pltVelocity
 
     def move_with_PD(self, endEffector, targetPosition, speed=0.01, orientation=None,
-        threshold=1e-3, maxIter=3000, debug=False, verbose=False):
+        threshold=1e-3, maxIter=1000, debug=False, verbose=False):
         """
         Move joints using inverse kinematics solver and using PD control.
         This method should update joint states using the torque output from the PD controller.
@@ -446,13 +451,62 @@ kukaId
         # controller to converge to the final target position after performing
         # all IK iterations (optional).
 
-        #return pltTime, pltDistance
-        pass
+        #initial parameters
+        iterNum = 10
+        eff_pos = self.getJointPosition(jointName=endEffector).T[0]  # dim: 3 * 1
+        self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition))
+        self.plot_time_dp.append(time.process_time())
 
-    def tick(self):
+        current_q = []
+        for joint_name in self.chain_dict[endEffector]:
+            if joint_name == 'RHAND' or joint_name == 'LHAND':
+                continue
+            joint_angle = self.getJointPos(jointName=joint_name) 
+            current_q.append(joint_angle)
+
+        step_positions = np.linspace(start=eff_pos, stop=targetPosition, num=iterNum)
+
+        for step in range(iterNum):
+            current_target = step_positions[step]
+
+            for _ in range(maxIter):
+                print('current: ', eff_pos)
+                print('target: ', targetPosition)
+                dy = targetPosition - eff_pos
+    
+                J = self.jacobianMatrix(endEffector)
+                d_theta = np.linalg.pinv(J).dot(dy)
+
+                current_q = current_q + d_theta
+
+                # moving by DP
+                self.tick(endEffector, current_q)
+
+                eff_pos = self.getJointPosition(jointName=endEffector).T[0]
+
+                print(np.linalg.norm(eff_pos - targetPosition))
+
+                self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition))
+                self.plot_time_dp.append(time.process_time())
+                if np.linalg.norm(eff_pos - targetPosition) < threshold:
+                    break
+
+        return np.array(self.plot_time_dp), np.array(self.plot_distance_dp)
+
+    def tick(self, endEffector, theta_list):
         """Ticks one step of simulation using PD control."""
         # Iterate through all joints and update joint states using PD control.
-        for joint in self.joints:
+        # for joint in self.joints:
+        i = 0
+        for joint in self.chain_dict[endEffector]:
+            integral = 0
+            x_ref = theta_list[i]  # target angle 
+            i += 1
+            x_real = self.getJointPos(joint) # endeffector angle 
+            dx_ref = 0 # target velocity
+            dx_real = self.getJointVel(joint) # endeffector velocity
+            
+
             # skip dummy joints (world to base joint)
             jointController = self.jointControllers[joint]
             if jointController == 'SKIP_THIS_JOINT':
@@ -468,7 +522,7 @@ kukaId
 
             ### Implement your code from here ... ###
             # TODO: obtain torque from PD controller
-            torque = 0.0  # TODO: fix me
+            torque = self.calculateTorque(x_ref, x_real, dx_ref, dx_real, integral, kp, ki, kd)
             ### ... to here ###
 
             self.p.setJointMotorControl2(
