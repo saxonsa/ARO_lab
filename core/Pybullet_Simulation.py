@@ -361,7 +361,9 @@ kukaId
             u(t) - the manipulation signal
         """
         # TODO: Add your code here
-        pass
+        u = kp * (x_ref - x_real) - kd * (dx_ref - dx_real)
+
+        return u
 
     # Task 2.2 Joint Manipulation
     def moveJoint(self, joint, targetPosition, targetVelocity, verbose=False):
@@ -371,6 +373,12 @@ kukaId
             targetPos - target joint position \\
             targetVel - target joint velocity
         """
+
+        pltTorque = []
+        x_list = []
+        x_target = []
+        x_velocity = []
+
         def toy_tick(x_ref, x_real, dx_ref, dx_real, integral):
             # loads your PID gains
             jointController = self.jointControllers[joint]
@@ -380,7 +388,7 @@ kukaId
 
             ### Start your code here: ###
             # Calculate the torque with the above method you've made
-            torque = 0.0
+            torque = self.calculateTorque(x_ref, x_real, dx_ref, dx_real, integral, kp, ki, kd)
             ### To here ###
 
             pltTorque.append(torque)
@@ -395,13 +403,29 @@ kukaId
             # calculate the physics and update the world
             self.p.stepSimulation()
             time.sleep(self.dt)
+        
+        # manually added here ----
+        for _ in range(1000):
+            dx_real = self.getJointVel(joint)
+            x_real = self.getJointPos(joint)
+            x_list.append(x_real)
+            x_target.append(targetPosition)
+            x_velocity.append(dx_real)
 
-        targetPosition, targetVelocity = float(targetPosition), float(targetVelocity)
+            # -------
+            targetPosition, targetVelocity = float(targetPosition), float(targetVelocity)
+
+            # manually added here ----
+            toy_tick(targetPosition, x_real, targetVelocity, dx_real, 0)
+            # -------
+
+        pltTime = np.arange(1000) * self.dt
 
         # disable joint velocity controller before apply a torque
         self.disableVelocityController(joint)
         # logging for the graph
-        pltTime, pltTarget, pltTorque, pltTorqueTime, pltPosition, pltVelocity = [], [], [], [], [], []
+        pltTime, pltTarget, pltTorque, pltTorqueTime, pltPosition, pltVelocity = \
+        pltTime, x_target, pltTorque, pltTime, x_list, x_velocity
 
         return pltTime, pltTarget, pltTorque, pltTorqueTime, pltPosition, pltVelocity
 
