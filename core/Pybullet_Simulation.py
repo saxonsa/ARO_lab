@@ -452,11 +452,12 @@ kukaId
         # all IK iterations (optional).
 
         #initial parameters
-        iterNum = 10
+        iterNum = 13
         eff_pos = self.getJointPosition(jointName=endEffector).T[0]  # dim: 3 * 1
         self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition))
         self.plot_time_dp.append(time.process_time())
 
+        # inverse kinematics
         current_q = []
         for joint_name in self.chain_dict[endEffector]:
             if joint_name == 'RHAND' or joint_name == 'LHAND':
@@ -469,27 +470,26 @@ kukaId
         for step in range(iterNum):
             current_target = step_positions[step]
 
-            for _ in range(maxIter):
-                print('current: ', eff_pos)
-                print('target: ', targetPosition)
-                dy = targetPosition - eff_pos
-    
-                J = self.jacobianMatrix(endEffector)
-                d_theta = np.linalg.pinv(J).dot(dy)
+            # for _ in range(maxIter):
+            dy = current_target - eff_pos
+            J = self.jacobianMatrix(endEffector)
+            d_theta = np.linalg.pinv(J).dot(dy)
 
-                current_q = current_q + d_theta
+            current_q += d_theta
 
-                # moving by DP
+            # moving by DP
+            for _ in range(80):
                 self.tick(endEffector, current_q)
 
-                eff_pos = self.getJointPosition(jointName=endEffector).T[0]
+            # check the position of effector after moving with PD
+            eff_pos = self.getJointPosition(jointName=endEffector).T[0]
 
-                print(np.linalg.norm(eff_pos - targetPosition))
+            print(np.linalg.norm(eff_pos - current_target))
 
-                self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition))
-                self.plot_time_dp.append(time.process_time())
-                if np.linalg.norm(eff_pos - targetPosition) < threshold:
-                    break
+            self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition))
+            self.plot_time_dp.append(time.process_time())
+                # if np.linalg.norm(eff_pos - current_target) < threshold:
+                #     break
 
         return np.array(self.plot_time_dp), np.array(self.plot_distance_dp)
 
