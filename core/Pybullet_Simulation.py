@@ -408,10 +408,16 @@ kukaId
             time.sleep(self.dt)
         
         # manually added here ----
-        for _ in range(1000):
-            dx_real = self.getJointVel(joint)
+        for i in range(1000):
+            # x_last =  x_list[i-1] if i != 0 else x_list[i]
+            if i == 0:
+                x_last = self.getJointPos(joint)
+            else:
+                x_last = x_list[i-1]
+            
             x_real = self.getJointPos(joint)
             x_list.append(x_real)
+            dx_real = (x_real - x_last) / self.dt # current pos - last pos / time
             x_target.append(targetPosition)
             x_velocity.append(dx_real)
 
@@ -435,7 +441,7 @@ kukaId
         return pltTime, pltTarget, pltTorque, pltTorqueTime, pltPosition, pltVelocity
 
     def move_with_PD(self, endEffector, targetPosition, speed=0.01, orientation=None,
-        threshold=1e-3, maxIter=1000, debug=False, verbose=False):
+        threshold=1e-3, maxIter=100, debug=False, verbose=False):
         """
         Move joints using inverse kinematics solver and using PD control.
         This method should update joint states using the torque output from the PD controller.
@@ -452,7 +458,7 @@ kukaId
         # all IK iterations (optional).
 
         #initial parameters
-        iterNum = 13
+        iterNum = 25
         eff_pos = self.getJointPosition(jointName=endEffector).T[0]  # dim: 3 * 1
         self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition))
         self.plot_time_dp.append(time.process_time())
@@ -467,44 +473,61 @@ kukaId
 
         step_positions = np.linspace(start=eff_pos, stop=targetPosition, num=iterNum)
 
-        for step in range(iterNum):
+        for step in range(1, iterNum):
             current_target = step_positions[step]
 
-            # for _ in range(maxIter):
             dy = current_target - eff_pos
             J = self.jacobianMatrix(endEffector)
             d_theta = np.linalg.pinv(J).dot(dy)
 
+            # last_q = current_q
             current_q += d_theta
 
             # moving by DP
-            for _ in range(80):
-                self.tick(endEffector, current_q)
+            new_x_real = list()
+            for _ in range(100):
+                if len(new_x_real) == 0:
+                    old_x_real = current_q
+                else:
+                    old_x_real = new_x_real
+                new_x_real = self.tick(endEffector, current_q, old_x_real)
 
             # check the position of effector after moving with PD
             eff_pos = self.getJointPosition(jointName=endEffector).T[0]
 
+            # print(np.linalg.norm(eff_pos - current_target))
             print(np.linalg.norm(eff_pos - current_target))
 
             self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition))
             self.plot_time_dp.append(time.process_time())
-                # if np.linalg.norm(eff_pos - current_target) < threshold:
-                #     break
+
+            if np.linalg.norm(eff_pos - targetPosition) < threshold:
+                print('stop')
+                break
 
         return np.array(self.plot_time_dp), np.array(self.plot_distance_dp)
 
-    def tick(self, endEffector, theta_list):
+    def tick(self, endEffector, theta_list, old_x_real):
         """Ticks one step of simulation using PD control."""
         # Iterate through all joints and update joint states using PD control.
         # for joint in self.joints:
+        new_x_real = []
+
         i = 0
         for joint in self.chain_dict[endEffector]:
             integral = 0
             x_ref = theta_list[i]  # target angle 
-            i += 1
-            x_real = self.getJointPos(joint) # endeffector angle 
+            
+            x_real = self.getJointPos(joint) # joint angle 
+            new_x_real.append(x_real)
+
             dx_ref = 0 # target velocity
-            dx_real = self.getJointVel(joint) # endeffector velocity
+
+
+            # dx_real1 = self.getJointVel(joint) # joint velocity
+            # dx_real2 = (x_real - last_q_list[i]) / self.dt
+            dx_real = (x_real - old_x_real[i]) / self.dt
+            i += 1
             
 
             # skip dummy joints (world to base joint)
@@ -548,6 +571,8 @@ kukaId
         self.p.stepSimulation()
         self.drawDebugLines()
         time.sleep(self.dt)
+
+        return new_x_real
 
     ########## Task 3: Robot Manipulation ##########
     def cubic_interpolation(self, points, nTimes=100):

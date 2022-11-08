@@ -47,74 +47,74 @@ robotConfigs = {
 sim = Simulation(pybulletConfigs, robotConfigs)
 
 # This is an example target (angular) position for the joint LARM_JOINT2
-# task2_jointName = "LARM_JOINT2"
-# task2_targetPosition = np.deg2rad(-45)  # joint (angular) position in radians
-# task2_targetVelocity = 0.0  # joint (angular) velocity in radians per second
-# verbose = False
-# task2_figure_name = "task2_PD_response.png"
-# task2_savefig = False
-# ## to here
+task2_jointName = "CHEST_JOINT0"
+task2_targetPosition = np.deg2rad(-45)  # joint (angular) position in radians
+task2_targetVelocity = 0.0  # joint (angular) velocity in radians per second
+verbose = False
+task2_figure_name = "task2_PD_response.png"
+task2_savefig = False
+## to here
 
 
-# pltTime, pltTarget, pltTorque, pltTorqueTime, pltPosition, pltVelocity = \
-#     sim.moveJoint(
-#         task2_jointName, task2_targetPosition, task2_targetVelocity, verbose)
+pltTime, pltTarget, pltTorque, pltTorqueTime, pltPosition, pltVelocity = \
+    sim.moveJoint(
+        task2_jointName, task2_targetPosition, task2_targetVelocity, verbose)
 
 
 # test move_with_PD ==========================
-endEffector = "LARM_JOINT5"
-targetPosition = np.array([0.37, 0.23, 1.06385])  # x,y,z coordinates in world frame
+# endEffector = "LARM_JOINT5"
+# targetPosition = np.array([0.37, 0.23, 1.06385])  # x,y,z coordinates in world frame
 
-pltTime, pltEFPosition = sim.move_with_PD(endEffector, targetPosition, speed=0.01, orientation=None, threshold=1e-3, maxIter=3000, debug=False, verbose=False)
+# pltTime, pltEFPosition = sim.move_with_PD(endEffector, targetPosition, speed=0.01, orientation=None, threshold=1e-3, maxIter=3000, debug=False, verbose=False)
 
-# Now plot some graphs
-task2_figure_name = "move_with_PD.png"
-task2_savefig = True
-# ...
+# # Now plot some graphs
+# task2_figure_name = "move_with_PD.png"
+# task2_savefig = True
+# # ...
 
-fig = plt.figure(figsize=(6, 4))
+# fig = plt.figure(figsize=(6, 4))
 
-print('pltTime', pltTime)
-print('plotEffPosition', pltEFPosition)
-plt.plot(pltTime, pltEFPosition, color='blue')
-plt.xlabel("Time s")
-plt.ylabel("Distance to target position")
-
-plt.suptitle("task2 move with PD", size=16)
-plt.tight_layout()
-plt.subplots_adjust(left=0.15)
-
-if task2_savefig:
-    fig.savefig(task2_figure_name)
-plt.show()
-
-# ========================================
-
-# modify the code in below if needed
-# fig = plt.figure(figsize=(6, 8))
-
-# plt.subplot(311)
-# plt.plot(pltTime, pltPosition, color='blue')
-# plt.plot(pltTime, pltTarget, color='magenta')
-# plt.ylabel("Theta rads")
-
-# plt.subplot(312)
-# plt.plot(pltTime, pltPosition, color='blue')
-# plt.plot(pltTime, pltVelocity, color='lightblue')
-# plt.ylabel("Velocity rads/s")
-
-# plt.subplot(313)
-# plt.plot(pltTorqueTime, pltTorque, color='orange')
+# print('pltTime', pltTime)
+# print('plotEffPosition', pltEFPosition)
+# plt.plot(pltTime, pltEFPosition, color='blue')
 # plt.xlabel("Time s")
-# plt.ylabel("Torque N")
+# plt.ylabel("Distance to target position")
 
-# plt.suptitle("Task2.2 Response of the controller", size=16)
+# plt.suptitle("task2 move with PD", size=16)
 # plt.tight_layout()
 # plt.subplots_adjust(left=0.15)
 
 # if task2_savefig:
 #     fig.savefig(task2_figure_name)
 # plt.show()
+
+# ========================================
+
+# modify the code in below if needed
+fig = plt.figure(figsize=(6, 8))
+
+plt.subplot(311)
+plt.plot(pltTime, pltPosition, color='blue')
+plt.plot(pltTime, pltTarget, color='magenta')
+plt.ylabel("Theta rads")
+
+plt.subplot(312)
+plt.plot(pltTime, pltPosition, color='blue')
+plt.plot(pltTime, pltVelocity, color='lightblue')
+plt.ylabel("Velocity rads/s")
+
+plt.subplot(313)
+plt.plot(pltTorqueTime, pltTorque, color='orange')
+plt.xlabel("Time s")
+plt.ylabel("Torque N")
+
+plt.suptitle("Task2.2 Response of the controller", size=16)
+plt.tight_layout()
+plt.subplots_adjust(left=0.15)
+
+if task2_savefig:
+    fig.savefig(task2_figure_name)
+plt.show()
 
 
 try:
