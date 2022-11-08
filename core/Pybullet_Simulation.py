@@ -458,7 +458,7 @@ kukaId
         # all IK iterations (optional).
 
         #initial parameters
-        iterNum = 25
+        iterNum = 20
         eff_pos = self.getJointPosition(jointName=endEffector).T[0]  # dim: 3 * 1
         self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition))
         self.plot_time_dp.append(time.process_time())
@@ -485,7 +485,7 @@ kukaId
 
             # moving by DP
             new_x_real = list()
-            for _ in range(100):
+            for _ in range(50):
                 if len(new_x_real) == 0:
                     old_x_real = current_q
                 else:
@@ -496,7 +496,7 @@ kukaId
             eff_pos = self.getJointPosition(jointName=endEffector).T[0]
 
             # print(np.linalg.norm(eff_pos - current_target))
-            print(np.linalg.norm(eff_pos - current_target))
+            print(np.linalg.norm(eff_pos - targetPosition))
 
             self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition))
             self.plot_time_dp.append(time.process_time())
@@ -585,6 +585,8 @@ kukaId
         # Return 'nTimes' points per dimension in 'points' (typically a 2xN array),
         # sampled from a cubic spline defined by 'points' and a boundary condition.
         # You may use methods found in scipy.interpolate
+
+        
 
         #return xpoints, ypoints
         pass

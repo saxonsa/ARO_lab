@@ -49,7 +49,7 @@ sim = Simulation(pybulletConfigs, robotConfigs)
 
 # test move_with_PD ==========================
 endEffector = "LARM_JOINT5"
-targetPosition = np.array([0.37, 0.23, 1.06385])  # x,y,z coordinates in world frame
+targetPosition = np.array([0.5, 0.5, 1.06385])  # x,y,z coordinates in world frame
 
 pltTime, pltEFPosition = sim.move_with_PD(endEffector, targetPosition, speed=0.01, orientation=None, threshold=1e-3, maxIter=3000, debug=False, verbose=False)
 

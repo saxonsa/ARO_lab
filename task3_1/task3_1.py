@@ -27,7 +27,7 @@ pybulletConfigs = {
     "pybullet_extra_data": pybullet_data,
     "gui": gui,
     "panels": False,
-    "realTime": False,
+    "realTime": True,
     "controlFrequency": 1000,
     "updateFrequency": 250,
     "gravity": -9.81,
@@ -41,7 +41,7 @@ robotConfigs = {
     "robotStartPos": [0, 0, 0.85],
     "robotStartOrientation": [0, 0, 0, 1],
     "fixedBase": False,
-    "colored": False
+    "colored": True
 }
 
 sim = Simulation(pybulletConfigs, robotConfigs)
