@@ -440,7 +440,7 @@ kukaId
 
         return pltTime, pltTarget, pltTorque, pltTorqueTime, pltPosition, pltVelocity
 
-    def move_with_PD(self, endEffector, targetPosition, speed=0.01, orientation=None,
+    def move_with_PD(self, endEffector, targetPosition=None, path=None, speed=0.01, orientation=None,
         threshold=1e-3, maxIter=100, debug=False, verbose=False):
         """
         Move joints using inverse kinematics solver and using PD control.
@@ -458,7 +458,7 @@ kukaId
         # all IK iterations (optional).
 
         #initial parameters
-        iterNum = 20
+        iterNum = 50
         eff_pos = self.getJointPosition(jointName=endEffector).T[0]  # dim: 3 * 1
         self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition))
         self.plot_time_dp.append(time.process_time())
@@ -473,6 +473,10 @@ kukaId
 
         step_positions = np.linspace(start=eff_pos, stop=targetPosition, num=iterNum)
 
+        if path is not None:
+            step_positions = path
+            iterNum = len(path)
+
         for step in range(1, iterNum):
             current_target = step_positions[step]
 
@@ -485,7 +489,7 @@ kukaId
 
             # moving by DP
             new_x_real = list()
-            for _ in range(50):
+            for _ in range(200):
                 if len(new_x_real) == 0:
                     old_x_real = current_q
                 else:
@@ -575,7 +579,7 @@ kukaId
         return new_x_real
 
     ########## Task 3: Robot Manipulation ##########
-    def cubic_interpolation(self, points, nTimes=100):
+    def cubic_interpolation(self, points, nTimes=20):
         """
         Given a set of control points, return the
         cubic spline defined by the control points,
@@ -586,17 +590,38 @@ kukaId
         # sampled from a cubic spline defined by 'points' and a boundary condition.
         # You may use methods found in scipy.interpolate
 
-        
+        # points = [[x,x,x], [y,y,y], [z,z,z]]
+
+        point_num = len(points)
+        cs = CubicSpline(range(point_num), points, bc_type='natural')
+        point_gap = (point_num - 1) / nTimes
+
+        xs = np.arange(0, (point_num - 1) + point_gap, point_gap)
+        return cs(xs)
 
         #return xpoints, ypoints
-        pass
 
     # Task 3.1 Pushing
-    def dockingToPosition(self, leftTargetAngle, rightTargetAngle, angularSpeed=0.005,
-            threshold=1e-1, maxIter=300, verbose=False):
-        """A template function for you, you are free to use anything else"""
-        # TODO: Append your code here
-        pass
+    # def dockingToPosition(self, leftTargetAngle, rightTargetAngle, angularSpeed=0.005,
+    #         threshold=1e-1, maxIter=300, verbose=False):
+    #     """A template function for you, you are free to use anything else"""
+        
+    #     # TODO: Append your code here
+    #     points = self.cubic_interpolation()        
+    #     pass
+    
+    def selfDockingToPosition(self, points, endEffector):
+        path = self.cubic_interpolation(points)
+
+        # plot path
+        # from mpl_toolkits.mplot3d import Axes3D
+        # fig = plt.figure(figsize=(10, 10))
+        # ax = fig.add_subplot(111, projection='3d')
+        # ax.scatter(path[:,0], path[:,1], path[:,2])
+        # plt.show()
+
+        self.move_with_PD(endEffector, targetPosition=path[-1], path=path)
+
 
     # Task 3.2 Grasping & Docking
     def clamp(self, leftTargetAngle, rightTargetAngle, angularSpeed=0.005, threshold=1e-1, maxIter=300, verbose=False):
