@@ -27,7 +27,7 @@ pybulletConfigs = {
     "pybullet_extra_data": pybullet_data,
     "gui": gui,
     "panels": False,
-    "realTime": True,
+    "realTime": False,
     "controlFrequency": 1000,
     "updateFrequency": 250,
     "gravity": -9.81,
@@ -90,13 +90,32 @@ def getReadyForTask():
 
 
 def solution():
+    
+    target_pos = finalTargetPos
+
+    path1 = [0.18, 0.3, 1] # ignore z-axis
+
+    endEffector = 'LARM_JOINT5'
+    left_arm_pos = sim.getJointPosition(endEffector).T[0] 
+    points = np.array([left_arm_pos, path1])
+    sim.selfDockingToPosition(points, endEffector)
+
+    path2 = [0.18, 0, 1]
+    left_arm_pos = sim.getJointPosition(endEffector).T[0] 
+    points = np.array([left_arm_pos, path2])
+    sim.selfDockingToPosition(points, endEffector)
+
+    path3 = [0.6, 0, 0.85]
+    left_arm_pos = sim.getJointPosition(endEffector).T[0] 
+    points = np.array([left_arm_pos, path3])
+    sim.selfDockingToPosition(points, endEffector)
+
     # TODO: Add your code here
-    pass
+    
 
 tableId, cubeId, targetId = getReadyForTask()
+
 solution()
-
-
 try:
     time.sleep(float(sys.argv[1]))
 except:
