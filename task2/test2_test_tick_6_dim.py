@@ -51,7 +51,7 @@ sim = Simulation(pybulletConfigs, robotConfigs)
 endEffector = "LARM_JOINT5"
 targetPosition = np.array([0.2, 0.3, 1])  # x,y,z coordinates in world frame
 
-pltTime, pltEFPosition = sim.move_with_PD(endEffector, targetPosition, speed=0.01, threshold=1e-3, maxIter=3000, orientation=None, debug=False, verbose=False)
+pltTime, pltEFPosition = sim.move_with_PD6(endEffector, targetPosition, orientation=[1, 0, 0], speed=0.01, threshold=1e-3, maxIter=3000, debug=False, verbose=False)
 
 # Now plot some graphs
 task2_figure_name = "move_with_PD.png"

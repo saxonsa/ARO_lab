@@ -93,14 +93,14 @@ def solution():
     
     target_pos = finalTargetPos
 
-    path1 = [0.18, 0.3, 1] # ignore z-axis
+    path1 = [0.2, 0.3, 1] # ignore z-axis
 
     endEffector = 'LARM_JOINT5'
     left_arm_pos = sim.getJointPosition(endEffector).T[0] 
     points = np.array([left_arm_pos, path1])
     sim.selfDockingToPosition(points, endEffector)
 
-    path2 = [0.18, 0, 1]
+    path2 = [0.2, 0.1, 1]
     left_arm_pos = sim.getJointPosition(endEffector).T[0] 
     points = np.array([left_arm_pos, path2])
     sim.selfDockingToPosition(points, endEffector)
@@ -110,7 +110,7 @@ def solution():
     points = np.array([left_arm_pos, path3])
     sim.selfDockingToPosition(points, endEffector)
 
-    # TODO: Add your code here
+    # TODO: Add your code hereorientation
     
 
 tableId, cubeId, targetId = getReadyForTask()
@@ -120,4 +120,3 @@ try:
     time.sleep(float(sys.argv[1]))
 except:
     time.sleep(10)
-

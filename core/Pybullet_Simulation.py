@@ -8,6 +8,7 @@ import math
 import re
 import time
 import yaml
+import pybullet as bullet_simulation
 
 from Pybullet_Simulation_base import Simulation_base
 
@@ -235,11 +236,13 @@ kukaId
         J = []  # 3 * n
         joint_chain = self.chain_dict[endEffector]
         pos_eff = self.getJointPosition(endEffector).T[0]
+        # print(pos_eff)
 
         for jointName in joint_chain:
             if jointName == endEffector:
                 rotationAxis = self.jointRotationAxis[jointName]
-                J.append(np.cross(rotationAxis, pos_eff))
+                # J.append(np.cross(rotationAxis, pos_eff))
+                J.append(np.cross(rotationAxis, [0, 0, 0]))
                 continue
             rotationAxis = self.jointRotationAxis[jointName]  # dim: 1 * 3
             jointPos = self.getJointPosition(jointName).T[0]  # pos, dim: 1 * 3, ([a, b, c])
@@ -249,6 +252,60 @@ kukaId
 
         return J
 
+    def jacobianMatrix6(self, endEffector):
+        
+        J = []  # 6 * n
+        J_O = []
+        joint_chain = self.chain_dict[endEffector]
+        pos_eff = self.getJointPosition(endEffector).T[0]
+        # print(pos_eff)
+
+        for jointName in joint_chain:
+            if jointName == endEffector:
+                rotationAxis = self.jointRotationAxis[jointName]
+                # J.append(np.cross(rotationAxis, pos_eff))
+                J.append(np.cross(rotationAxis, [0, 0, 0]))
+                continue
+            rotationAxis = self.jointRotationAxis[jointName]  # dim: 1 * 3
+            jointPos = self.getJointPosition(jointName).T[0]  # pos, dim: 1 * 3, ([a, b, c])
+            J.append(np.cross(rotationAxis, (pos_eff - jointPos)))
+
+        for jointName in joint_chain:
+            # endeffect axies 
+            rotationAxis = self.jointRotationAxis[jointName]
+            a_effector = self.jointRotationAxis[endEffector]
+            jointOre = np.cross(rotationAxis, a_effector)
+            J_O.append(jointOre)
+
+        J = np.array(J).T
+        J_O = np.array(J_O).T
+
+        def getMotorJointStates(p, robot):
+            joint_states = p.getJointStates(robot, range(p.getNumJoints(robot)))
+            joint_infos = [p.getJointInfo(robot, i) for i in range(p.getNumJoints(robot))]
+            joint_states = [j for j, i in zip(joint_states, joint_infos) if i[3] > -1]
+            joint_positions = [state[0] for state in joint_states]
+            joint_velocities = [state[1] for state in joint_states]
+            joint_torques = [state[3] for state in joint_states]
+            return joint_positions, joint_velocities, joint_torques
+
+        mpos, mvel, mtorq = getMotorJointStates(bullet_simulation, self.robot)
+
+        j_geo, j_rot = bullet_simulation.calculateJacobian(
+        self.robot, 
+        self.jointIds['LARM_JOINT5'],
+        [0,0,0], 
+        mpos,
+        [0.0] * len(mpos),
+        [0.0] * len(mpos),)
+
+        print(J)
+        print(j_geo)
+
+        J_new = np.concatenate((J, J_O), axis=0)
+
+        return J_new
+    
     # Task 1.2 Inverse Kinematics
 
     def inverseKinematics(self, endEffector, targetPosition, orientation, interpolationSteps, maxIterPerStep, threshold):
@@ -458,7 +515,7 @@ kukaId
         # all IK iterations (optional).
 
         #initial parameters
-        iterNum = 50
+        iterNum = 25
         eff_pos = self.getJointPosition(jointName=endEffector).T[0]  # dim: 3 * 1
         self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition))
         self.plot_time_dp.append(time.process_time())
@@ -511,6 +568,80 @@ kukaId
 
         return np.array(self.plot_time_dp), np.array(self.plot_distance_dp)
 
+    def move_with_PD6(self, endEffector, targetPosition=None, orientation=None, path=None, speed=0.01,
+        threshold=1e-3, maxIter=100, debug=False, verbose=False):
+        """
+        Move joints using inverse kinematics solver and using PD control.
+        This method should update joint states using the torque output from the PD controller.
+        Return:
+            pltTime, pltDistance arrays used for plotting
+        """
+        #TODO add your code here
+        # Iterate through joints and use states from IK solver as reference states in PD controller.
+        # Perform iterations to track reference states using PD controller until reaching
+        # max iterations or position threshold.
+
+        # Hint: here you can add extra steps if you want to allow your PD
+        # controller to converge to the final target position after performing
+        # all IK iterations (optional).
+
+        #initial parameters
+        iterNum = 50
+        eff_pos = self.getJointPosition(jointName=endEffector).T[0]  # dim: 1 * 3
+        eff_orientation = self.getJointOrientation(jointName=endEffector) # dim: 1 * 3
+        eff_config = np.concatenate((eff_pos, eff_orientation), axis=0)
+        self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition[0:3]))
+        self.plot_time_dp.append(time.process_time())
+
+        # inverse kinematics
+        current_q = []
+        for joint_name in self.chain_dict[endEffector]:
+            if joint_name == 'RHAND' or joint_name == 'LHAND':
+                continue
+            joint_angle = self.getJointPos(jointName=joint_name) 
+            current_q.append(joint_angle)
+        
+        step_positions = np.linspace(start=eff_pos, stop=targetPosition, num=iterNum)
+        if path is not None:
+            step_positions = path
+            iterNum = len(path)
+
+        for step in range(1, iterNum):
+            current_target = np.concatenate((step_positions[step], orientation), axis=0)
+
+            dy = current_target - eff_config
+            J = self.jacobianMatrix6(endEffector)
+            d_theta = np.linalg.pinv(J).dot(dy)
+
+            # last_q = current_q
+            current_q += d_theta
+
+            # moving by DP
+            new_x_real = list()
+            for _ in range(150):
+                if len(new_x_real) == 0:
+                    old_x_real = current_q
+                else:
+                    old_x_real = new_x_real
+                new_x_real = self.tick(endEffector, current_q, old_x_real)
+
+            # check the position of effector after moving with PD
+            eff_pos = self.getJointPosition(jointName=endEffector).T[0]
+            eff_orientation = self.getJointOrientation(jointName=endEffector)
+            eff_config = np.concatenate((eff_pos, eff_orientation), axis=0)
+
+            # print(np.linalg.norm(eff_pos - current_target))
+            print(np.linalg.norm(eff_pos - targetPosition))
+
+            self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition))
+            self.plot_time_dp.append(time.process_time())
+
+            if np.linalg.norm(eff_pos - targetPosition) < threshold:
+                print('stop')
+                break
+
+        return np.array(self.plot_time_dp), np.array(self.plot_distance_dp)
+
     def tick(self, endEffector, theta_list, old_x_real):
         """Ticks one step of simulation using PD control."""
         # Iterate through all joints and update joint states using PD control.
@@ -526,7 +657,6 @@ kukaId
             new_x_real.append(x_real)
 
             dx_ref = 0 # target velocity
-
 
             # dx_real1 = self.getJointVel(joint) # joint velocity
             # dx_real2 = (x_real - last_q_list[i]) / self.dt
@@ -579,7 +709,7 @@ kukaId
         return new_x_real
 
     ########## Task 3: Robot Manipulation ##########
-    def cubic_interpolation(self, points, nTimes=20):
+    def cubic_interpolation(self, points, nTimes=100):
         """
         Given a set of control points, return the
         cubic spline defined by the control points,
@@ -590,7 +720,7 @@ kukaId
         # sampled from a cubic spline defined by 'points' and a boundary condition.
         # You may use methods found in scipy.interpolate
 
-        # points = [[x,x,x], [y,y,y], [z,z,z]]
+        # points = [start, target]
 
         point_num = len(points)
         cs = CubicSpline(range(point_num), points, bc_type='natural')
@@ -620,7 +750,8 @@ kukaId
         # ax.scatter(path[:,0], path[:,1], path[:,2])
         # plt.show()
 
-        self.move_with_PD(endEffector, targetPosition=path[-1], path=path)
+        orientation = [1, 0, 0]
+        self.move_with_PD6(endEffector, targetPosition=path[-1], orientation=orientation, path=path)
 
 
     # Task 3.2 Grasping & Docking
