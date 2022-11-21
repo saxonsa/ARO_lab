@@ -38,7 +38,7 @@ pybulletConfigs = {
 }
 robotConfigs = {
     "robotPath": core_path + "/nextagea_description/urdf/NextageaOpen.urdf",
-    "robotPIDConfigs": core_path + "/PD_gains_6_dim.yaml",
+    "robotPIDConfigs": core_path + "/PD_gains.yaml",
     "robotStartPos": [0, 0, 0.85],
     "robotStartOrientation": [0, 0, 0, 1],
     "fixedBase": True,
@@ -51,7 +51,7 @@ sim = Simulation(pybulletConfigs, robotConfigs)
 endEffector = "LARM_JOINT5"
 targetPosition = np.array([0.2, 0.3, 1])  # x,y,z coordinates in world frame
 
-pltTime, pltEFPosition = sim.move_with_PD(endEffector, targetPosition, speed=0.01, threshold=1e-3, maxIter=3000, orientation=None, debug=False, verbose=False)
+pltTime, pltEFPosition = sim.move_with_PD6(endEffector, targetPosition, speed=0.01, threshold=1e-3, maxIter=100, orientation=None, debug=False, verbose=False)
 
 # Now plot some graphs
 task2_figure_name = "move_with_PD.png"
