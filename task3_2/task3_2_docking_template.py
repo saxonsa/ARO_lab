@@ -93,7 +93,7 @@ def getReadyForTask():
     )
 
     for _ in range(300):
-        sim.tick()
+        # sim.tick()
         time.sleep(1./1000)
 
     return tableId, cubeId, targetId
@@ -105,3 +105,10 @@ def solution():
 
 tableId, cubeId, targetId = getReadyForTask()
 solution()
+
+
+try:
+    time.sleep(float(sys.argv[1]))
+except:
+    time.sleep(10)
+
