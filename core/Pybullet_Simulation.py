@@ -334,10 +334,6 @@ kukaId
             current_q = current_q + d_theta
             traj.append(current_q)
 
-            # i = 0
-            # for joint_name in self.chain_dict[endEffector]:
-            #     self.p.resetJointState(self.robot, self.jointIds[joint_name], traj[-1][i])
-            #     i += 1
             i = 0
             for joint_name in self.chain_dict[endEffector]:
                 self.jointTargetPos[joint_name] = current_q[i]
@@ -502,7 +498,7 @@ kukaId
         # all IK iterations (optional).
 
         #initial parameters
-        iterNum = 25
+        iterNum = 100
         eff_pos = self.getJointPosition(jointName=endEffector).T[0]  # dim: 3 * 1
         self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition))
         self.plot_time_dp.append(time.process_time())
@@ -520,6 +516,8 @@ kukaId
         if path is not None:
             step_positions = path
             iterNum = len(path)
+        
+        old_x_real = list()
 
         for step in range(1, iterNum):
             current_target = step_positions[step]
@@ -533,12 +531,16 @@ kukaId
 
             # moving by DP
             new_x_real = list()
-            for _ in range(200):
-                if len(new_x_real) == 0:
-                    old_x_real = current_q
-                else:
-                    old_x_real = new_x_real
-                new_x_real = self.tick(endEffector, current_q, old_x_real)
+            # for _ in range(200):
+            #     if len(new_x_real) == 0:
+            #         old_x_real = current_q
+            #     else:
+            #         old_x_real = new_x_real
+            if len(new_x_real) == 0:
+                old_x_real = current_q
+            else:
+                old_x_real = new_x_real
+            new_x_real = self.tick(endEffector, current_q, old_x_real)
 
             # check the position of effector after moving with PD
             eff_pos = self.getJointPosition(jointName=endEffector).T[0]
@@ -573,7 +575,7 @@ kukaId
         # all IK iterations (optional).
 
         #initial parameters
-        iterNum = 50
+        iterNum = 20
         eff_pos = self.getJointPosition(jointName=endEffector).T[0]  # dim: 1 * 3
         eff_orientation = self.getJointOrientation(jointName=endEffector) # dim: 1 * 3
         eff_config = np.concatenate((eff_pos, eff_orientation), axis=0)
@@ -592,9 +594,15 @@ kukaId
         if path is not None:
             step_positions = path
             iterNum = len(path)
+        
+        new_x_real, old_x_real = [], []
 
         for step in range(1, iterNum):
-            current_target = np.concatenate((step_positions[step], orientation), axis=0)
+            if orientation is not None:
+                current_target = np.concatenate((step_positions[step], orientation), axis=0)
+            else:
+                current_target = np.concatenate((step_positions[step], eff_orientation), axis=0)
+
 
             dy = current_target - eff_config
             J = self.jacobianMatrix6(endEffector)
@@ -604,12 +612,12 @@ kukaId
             current_q += d_theta
 
             # moving by DP
-            new_x_real = list()
-            for _ in range(150):
+            for _ in range(60):
                 if len(new_x_real) == 0:
                     old_x_real = current_q
                 else:
                     old_x_real = new_x_real
+
                 new_x_real = self.tick(endEffector, current_q, old_x_real)
 
             # check the position of effector after moving with PD
@@ -626,7 +634,7 @@ kukaId
             if np.linalg.norm(eff_pos - targetPosition) < threshold:
                 print('stop')
                 break
-
+            
         return np.array(self.plot_time_dp), np.array(self.plot_distance_dp)
 
     def tick(self, endEffector, theta_list, old_x_real):
@@ -737,8 +745,7 @@ kukaId
         # ax.scatter(path[:,0], path[:,1], path[:,2])
         # plt.show()
 
-        orientation = [1, 0, 0]
-        self.move_with_PD6(endEffector, targetPosition=path[-1], orientation=orientation, path=path)
+        self.move_with_PD6(endEffector, targetPosition=path[-1], path=path)
 
 
     # Task 3.2 Grasping & Docking
