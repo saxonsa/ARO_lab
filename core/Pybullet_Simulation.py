@@ -236,13 +236,12 @@ kukaId
         J = []  # 3 * n
         joint_chain = self.chain_dict[endEffector]
         pos_eff = self.getJointPosition(endEffector).T[0]
-        # print(pos_eff)
 
         for jointName in joint_chain:
             if jointName == endEffector:
                 rotationAxis = self.jointRotationAxis[jointName]
-                # J.append(np.cross(rotationAxis, pos_eff))
-                J.append(np.cross(rotationAxis, [0, 0, 0]))
+                J.append(np.cross(rotationAxis, pos_eff))
+                # J.append(np.cross(rotationAxis, [0, 0, 0]))
                 continue
             rotationAxis = self.jointRotationAxis[jointName]  # dim: 1 * 3
             jointPos = self.getJointPosition(jointName).T[0]  # pos, dim: 1 * 3, ([a, b, c])
@@ -254,57 +253,35 @@ kukaId
 
     def jacobianMatrix6(self, endEffector):
         
-        J = []  # 6 * n
-        J_O = []
+        J = []  # 3 * n
         joint_chain = self.chain_dict[endEffector]
         pos_eff = self.getJointPosition(endEffector).T[0]
-        # print(pos_eff)
 
         for jointName in joint_chain:
             if jointName == endEffector:
                 rotationAxis = self.jointRotationAxis[jointName]
-                # J.append(np.cross(rotationAxis, pos_eff))
-                J.append(np.cross(rotationAxis, [0, 0, 0]))
+                J.append(np.cross(rotationAxis, pos_eff))
+                # J.append(np.cross(rotationAxis, [0, 0, 0]))
                 continue
             rotationAxis = self.jointRotationAxis[jointName]  # dim: 1 * 3
             jointPos = self.getJointPosition(jointName).T[0]  # pos, dim: 1 * 3, ([a, b, c])
             J.append(np.cross(rotationAxis, (pos_eff - jointPos)))
 
+        J = np.array(J).T
+
+        J_O = []
         for jointName in joint_chain:
             # endeffect axies 
             rotationAxis = self.jointRotationAxis[jointName]
             a_effector = self.jointRotationAxis[endEffector]
-            jointOre = np.cross(rotationAxis, a_effector)
-            J_O.append(jointOre)
-
-        J = np.array(J).T
+            jointOrientation = np.cross(rotationAxis, a_effector)
+            J_O.append(jointOrientation)
+        
         J_O = np.array(J_O).T
 
-        def getMotorJointStates(p, robot):
-            joint_states = p.getJointStates(robot, range(p.getNumJoints(robot)))
-            joint_infos = [p.getJointInfo(robot, i) for i in range(p.getNumJoints(robot))]
-            joint_states = [j for j, i in zip(joint_states, joint_infos) if i[3] > -1]
-            joint_positions = [state[0] for state in joint_states]
-            joint_velocities = [state[1] for state in joint_states]
-            joint_torques = [state[3] for state in joint_states]
-            return joint_positions, joint_velocities, joint_torques
+        J_6_dim = np.concatenate((J, J_O), axis=0)
 
-        mpos, mvel, mtorq = getMotorJointStates(bullet_simulation, self.robot)
-
-        j_geo, j_rot = bullet_simulation.calculateJacobian(
-        self.robot, 
-        self.jointIds['LARM_JOINT5'],
-        [0,0,0], 
-        mpos,
-        [0.0] * len(mpos),
-        [0.0] * len(mpos),)
-
-        print(J)
-        print(j_geo)
-
-        J_new = np.concatenate((J, J_O), axis=0)
-
-        return J_new
+        return J_6_dim
     
     # Task 1.2 Inverse Kinematics
 
@@ -323,6 +300,8 @@ kukaId
         """
         # TODO add your code here
         current_q = []
+        eff_config, eff_orientation, eff_pos = None, None, None
+
         for joint_name in self.chain_dict[endEffector]:
             if joint_name == 'RHAND' or joint_name == 'LHAND':
                 continue
@@ -330,43 +309,51 @@ kukaId
             current_q.append(joint_angle)
 
         eff_pos = self.getJointPosition(jointName=endEffector).T[0]  # dim: 3 * 1
+        eff_config = eff_pos
         self.plot_distance.append(np.linalg.norm(eff_pos - targetPosition))
         self.plot_time.append(time.process_time())
+
+        eff_orientation = self.getJointOrientation(jointName=endEffector)
+        eff_config = np.concatenate((eff_pos, eff_orientation), axis=0)
 
         traj = [current_q]
         step_positions=np.linspace(start=eff_pos, stop=targetPosition, num=interpolationSteps)
 
         for step in range(1, interpolationSteps):
-            current_target = step_positions[step]
+            dy, J = None, None
 
-            for _ in range(maxIterPerStep):
-                dy = current_target - eff_pos
- 
-                J = self.jacobianMatrix(endEffector)
-                d_theta = np.linalg.pinv(J).dot(dy)
+            if orientation is not None:
+                current_target = np.concatenate((step_positions[step], orientation), axis=0)
+            else:
+                current_target = np.concatenate((step_positions[step], eff_orientation), axis=0)
+            dy = current_target - eff_config
+            J = self.jacobianMatrix6(endEffector)
 
-                current_q = current_q + d_theta
-                traj.append(current_q)
+            d_theta = np.linalg.pinv(J).dot(dy)
 
-                # i = 0
-                # for joint_name in self.chain_dict[endEffector]:
-                #     self.p.resetJointState(self.robot, self.jointIds[joint_name], traj[-1][i])
-                #     i += 1
-                i = 0
-                for joint_name in self.chain_dict[endEffector]:
-                    self.jointTargetPos[joint_name] = current_q[i]
-                    i += 1
-                    
-                self.tick_without_PD(endEffector)
-                print(np.linalg.norm(eff_pos - targetPosition))
+            current_q = current_q + d_theta
+            traj.append(current_q)
+
+            # i = 0
+            # for joint_name in self.chain_dict[endEffector]:
+            #     self.p.resetJointState(self.robot, self.jointIds[joint_name], traj[-1][i])
+            #     i += 1
+            i = 0
+            for joint_name in self.chain_dict[endEffector]:
+                self.jointTargetPos[joint_name] = current_q[i]
+                i += 1
                 
-                eff_pos = self.getJointPosition(jointName=endEffector).T[0]
+            self.tick_without_PD(endEffector)
+            print(np.linalg.norm(eff_pos - targetPosition))
+            
+            eff_pos = self.getJointPosition(jointName=endEffector).T[0]
+            eff_orientation = self.getJointOrientation(jointName=endEffector)
+            eff_config = np.concatenate((eff_pos, eff_orientation), axis=0)
 
-                self.plot_distance.append(np.linalg.norm(eff_pos - targetPosition))
-                self.plot_time.append(time.process_time())
-                if np.linalg.norm(eff_pos - current_target) < threshold:
-                    break
-
+            self.plot_distance.append(np.linalg.norm(eff_pos - targetPosition))
+            self.plot_time.append(time.process_time())
+            if np.linalg.norm(eff_pos - targetPosition) < threshold:
+                break
 
         return traj
         # Hint: return a numpy array which includes the reference angular
@@ -384,7 +371,7 @@ kukaId
         #TODO add your code here
         # iterate through joints and update joint states based on IK solver
 
-        _ = self.inverseKinematics(endEffector, targetPosition, orientation, interpolationSteps=5, maxIterPerStep=maxIter, threshold=threshold)
+        _ = self.inverseKinematics(endEffector, targetPosition, orientation, interpolationSteps=50, maxIterPerStep=maxIter, threshold=threshold)
 
         return np.array(self.plot_time), np.array(self.plot_distance)
         #return pltTime, pltDistance
