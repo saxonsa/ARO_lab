@@ -99,25 +99,58 @@ def solution():
 #             'targetPosition': [0.25, -0.15, 0.95]
 #         },
     paths = [
+        # yaobai
         {
             'endEffector': 'LARM_JOINT5',
-            'targetPosition': [0.22, 0.3, 0.95]
+            'targetPosition': [0.22, 0.25, 1.05]
         },
-        # {
-        #     'endEffector': 'LARM_JOINT5',
-        #     'targetPosition': [0.2, 0.1, 1]
-        # },
         {
             'endEffector': 'RARM_JOINT5',
-            'targetPosition': [0.35, -0.20, 0.95]
+            'targetPosition': [0.35, -0.20, 1.05]
         },
         {
             'endEffector': 'LARM_JOINT5',
-            'targetPosition': [0.15, 0.15, 0.95]
+            'targetPosition': [0.20, 0.15, 0.95]
+        },
+        {
+            'endEffector': 'RARM_JOINT5',
+            'targetPosition': [0.22, -0.12, 0.95]
+        },
+        {
+            'endEffector': 'LARM_JOINT5',
+            'targetPosition': [0.23, 0.08, 0.93]
+        },
+        {
+            'endEffector': 'RARM_JOINT5',
+            'targetPosition': [0.24, -0.08, 0.93]
+        },
+        {
+            'endEffector': 'RARM_JOINT5',
+            'targetPosition': [0.30, -0.06, 0.92]
+        },
+        {
+            'endEffector': 'LARM_JOINT5',
+            'targetPosition': [0.40, 0.06, 0.92]
+        },
+        {
+            'endEffector': 'RARM_JOINT5',
+            'targetPosition': [0.42, -0.04, 0.92]
+        },
+        {
+            'endEffector': 'LARM_JOINT5',
+            'targetPosition': [0.45, 0.04, 0.92]
+        },
+        {
+            'endEffector': 'RARM_JOINT5',
+            'targetPosition': [0.43, -0.03, 0.92]
         },
         # {
         #     'endEffector': 'LARM_JOINT5',
-        #     'targetPosition': finalTargetPos
+        #     'targetPosition': [0.50, 0.03, 0.92]
+        # },
+        # {
+        #     'endEffector': 'LARM_JOINT5',
+        #     'targetPosition': [0.20, 0.12, 1.0]
         # },
     ]
 
