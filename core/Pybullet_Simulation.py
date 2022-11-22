@@ -100,6 +100,7 @@ class Simulation(Simulation_base):
     plot_distance = []
     plot_time_dp = []
     plot_distance_dp = []
+    ignore_joints = ['base_to_dummy', 'base_to_waist', 'RHAND', 'LHAND']
 
     def getJointRotationalMatrix(self, jointName=None, theta=None):
         """
@@ -236,13 +237,12 @@ kukaId
         J = []  # 3 * n
         joint_chain = self.chain_dict[endEffector]
         pos_eff = self.getJointPosition(endEffector).T[0]
-        # print(pos_eff)
 
         for jointName in joint_chain:
             if jointName == endEffector:
                 rotationAxis = self.jointRotationAxis[jointName]
-                # J.append(np.cross(rotationAxis, pos_eff))
-                J.append(np.cross(rotationAxis, [0, 0, 0]))
+                J.append(np.cross(rotationAxis, pos_eff))
+                # J.append(np.cross(rotationAxis, [0, 0, 0]))
                 continue
             rotationAxis = self.jointRotationAxis[jointName]  # dim: 1 * 3
             jointPos = self.getJointPosition(jointName).T[0]  # pos, dim: 1 * 3, ([a, b, c])
@@ -254,57 +254,57 @@ kukaId
 
     def jacobianMatrix6(self, endEffector):
         
-        J = []  # 6 * n
-        J_O = []
+        J = []  # 3 * n
         joint_chain = self.chain_dict[endEffector]
         pos_eff = self.getJointPosition(endEffector).T[0]
-        # print(pos_eff)
-
-        for jointName in joint_chain:
-            if jointName == endEffector:
-                rotationAxis = self.jointRotationAxis[jointName]
-                # J.append(np.cross(rotationAxis, pos_eff))
-                J.append(np.cross(rotationAxis, [0, 0, 0]))
+        
+        for jointName, _ in self.frameTranslationFromParent.items():
+            if jointName in self.ignore_joints:
                 continue
-            rotationAxis = self.jointRotationAxis[jointName]  # dim: 1 * 3
-            jointPos = self.getJointPosition(jointName).T[0]  # pos, dim: 1 * 3, ([a, b, c])
-            J.append(np.cross(rotationAxis, (pos_eff - jointPos)))
+            elif jointName not in joint_chain:
+                J.append(np.array([0, 0, 0]))
+            else:
+                rotationAxis = self.jointRotationAxis[jointName]  # dim: 1 * 3
+                jointPos = self.getJointPosition(jointName).T[0]  # pos, dim: 1 * 3, ([a, b, c])
+                J.append(np.cross(rotationAxis, (pos_eff - jointPos)))
 
-        for jointName in joint_chain:
-            # endeffect axies 
-            rotationAxis = self.jointRotationAxis[jointName]
-            a_effector = self.jointRotationAxis[endEffector]
-            jointOre = np.cross(rotationAxis, a_effector)
-            J_O.append(jointOre)
+        # for jointName in joint_chain:
+        #     if jointName == endEffector:
+        #         rotationAxis = self.jointRotationAxis[jointName]
+        #         J.append(np.cross(rotationAxis, pos_eff))
+        #         # J.append(np.cross(rotationAxis, [0, 0, 0]))
+        #         continue
+        #     rotationAxis = self.jointRotationAxis[jointName]  # dim: 1 * 3
+        #     jointPos = self.getJointPosition(jointName).T[0]  # pos, dim: 1 * 3, ([a, b, c])
+        #     J.append(np.cross(rotationAxis, (pos_eff - jointPos)))
 
         J = np.array(J).T
+
+        J_O = []
+
+        for jointName, _ in self.frameTranslationFromParent.items():
+            if jointName in self.ignore_joints:
+                continue
+            elif jointName not in joint_chain:
+                J_O.append(np.array([0, 0, 0]))
+            else:
+                rotationAxis = self.jointRotationAxis[jointName]
+                a_effector = self.jointRotationAxis[endEffector]
+                jointOrientation = np.cross(rotationAxis, a_effector)
+                J_O.append(jointOrientation)
+
+        # for jointName in joint_chain:
+        #     # endeffect axies 
+        #     rotationAxis = self.jointRotationAxis[jointName]
+        #     a_effector = self.jointRotationAxis[endEffector]
+        #     jointOrientation = np.cross(rotationAxis, a_effector)
+        #     J_O.append(jointOrientation)
+        
         J_O = np.array(J_O).T
 
-        def getMotorJointStates(p, robot):
-            joint_states = p.getJointStates(robot, range(p.getNumJoints(robot)))
-            joint_infos = [p.getJointInfo(robot, i) for i in range(p.getNumJoints(robot))]
-            joint_states = [j for j, i in zip(joint_states, joint_infos) if i[3] > -1]
-            joint_positions = [state[0] for state in joint_states]
-            joint_velocities = [state[1] for state in joint_states]
-            joint_torques = [state[3] for state in joint_states]
-            return joint_positions, joint_velocities, joint_torques
+        J_6_dim = np.concatenate((J, J_O), axis=0)
 
-        mpos, mvel, mtorq = getMotorJointStates(bullet_simulation, self.robot)
-
-        j_geo, j_rot = bullet_simulation.calculateJacobian(
-        self.robot, 
-        self.jointIds['LARM_JOINT5'],
-        [0,0,0], 
-        mpos,
-        [0.0] * len(mpos),
-        [0.0] * len(mpos),)
-
-        print(J)
-        print(j_geo)
-
-        J_new = np.concatenate((J, J_O), axis=0)
-
-        return J_new
+        return J_6_dim
     
     # Task 1.2 Inverse Kinematics
 
@@ -323,50 +323,71 @@ kukaId
         """
         # TODO add your code here
         current_q = []
-        for joint_name in self.chain_dict[endEffector]:
-            if joint_name == 'RHAND' or joint_name == 'LHAND':
+        eff_config, eff_orientation, eff_pos = None, None, None
+
+        for joint_name, _ in self.frameTranslationFromParent.items():
+            if joint_name in self.ignore_joints:
                 continue
-            joint_angle = self.getJointPos(jointName=joint_name) 
-            current_q.append(joint_angle)
+            else:
+                joint_angle = self.getJointPos(jointName=joint_name) 
+                current_q.append(joint_angle)
+
+        # for joint_name in self.chain_dict[endEffector]:
+        #     if joint_name == 'RHAND' or joint_name == 'LHAND':
+        #         continue
+        #     joint_angle = self.getJointPos(jointName=joint_name) 
+        #     current_q.append(joint_angle)
 
         eff_pos = self.getJointPosition(jointName=endEffector).T[0]  # dim: 3 * 1
+        eff_config = eff_pos
         self.plot_distance.append(np.linalg.norm(eff_pos - targetPosition))
         self.plot_time.append(time.process_time())
+
+        eff_orientation = self.getJointOrientation(jointName=endEffector)
+        eff_config = np.concatenate((eff_pos, eff_orientation), axis=0)
 
         traj = [current_q]
         step_positions=np.linspace(start=eff_pos, stop=targetPosition, num=interpolationSteps)
 
         for step in range(1, interpolationSteps):
-            current_target = step_positions[step]
+            dy, J = None, None
 
-            for _ in range(maxIterPerStep):
-                dy = current_target - eff_pos
- 
-                J = self.jacobianMatrix(endEffector)
-                d_theta = np.linalg.pinv(J).dot(dy)
+            if orientation is not None:
+                current_target = np.concatenate((step_positions[step], orientation), axis=0)
+            else:
+                current_target = np.concatenate((step_positions[step], eff_orientation), axis=0)
+            dy = current_target - eff_config
+            J = self.jacobianMatrix6(endEffector)
 
-                current_q = current_q + d_theta
-                traj.append(current_q)
+            d_theta = np.linalg.pinv(J).dot(dy)
 
-                # i = 0
-                # for joint_name in self.chain_dict[endEffector]:
-                #     self.p.resetJointState(self.robot, self.jointIds[joint_name], traj[-1][i])
-                #     i += 1
-                i = 0
-                for joint_name in self.chain_dict[endEffector]:
+            current_q = current_q + d_theta
+            traj.append(current_q)
+
+            # i = 0
+            # for joint_name in self.chain_dict[endEffector]:
+            #     self.jointTargetPos[joint_name] = current_q[i]
+            #     i += 1
+            i = 0
+            for joint_name, _ in self.frameTranslationFromParent.items():
+                if joint_name in self.ignore_joints:
+                    continue
+                else:
                     self.jointTargetPos[joint_name] = current_q[i]
                     i += 1
-                    
-                self.tick_without_PD(endEffector)
-                print(np.linalg.norm(eff_pos - targetPosition))
-                
-                eff_pos = self.getJointPosition(jointName=endEffector).T[0]
+            
 
-                self.plot_distance.append(np.linalg.norm(eff_pos - targetPosition))
-                self.plot_time.append(time.process_time())
-                if np.linalg.norm(eff_pos - current_target) < threshold:
-                    break
+            self.tick_without_PD(endEffector)
+            print(np.linalg.norm(eff_pos - targetPosition))
+            
+            eff_pos = self.getJointPosition(jointName=endEffector).T[0]
+            eff_orientation = self.getJointOrientation(jointName=endEffector)
+            eff_config = np.concatenate((eff_pos, eff_orientation), axis=0)
 
+            self.plot_distance.append(np.linalg.norm(eff_pos - targetPosition))
+            self.plot_time.append(time.process_time())
+            if np.linalg.norm(eff_pos - targetPosition) < threshold:
+                break
 
         return traj
         # Hint: return a numpy array which includes the reference angular
@@ -384,7 +405,7 @@ kukaId
         #TODO add your code here
         # iterate through joints and update joint states based on IK solver
 
-        _ = self.inverseKinematics(endEffector, targetPosition, orientation, interpolationSteps=5, maxIterPerStep=maxIter, threshold=threshold)
+        _ = self.inverseKinematics(endEffector, targetPosition, orientation, interpolationSteps=50, maxIterPerStep=maxIter, threshold=threshold)
 
         return np.array(self.plot_time), np.array(self.plot_distance)
         #return pltTime, pltDistance
@@ -395,10 +416,15 @@ kukaId
         # TODO modify from here
         # Iterate through all joints and update joint states.
             # For each joint, you can use the shared variable self.jointTargetPos.
-        i = 0
-        for joint_name in self.chain_dict[endEffector]:
-            self.p.resetJointState(self.robot, self.jointIds[joint_name], self.jointTargetPos[joint_name])
-            i += 1
+        # i = 0
+        # for joint_name in self.chain_dict[endEffector]:
+        #     self.p.resetJointState(self.robot, self.jointIds[joint_name], self.jointTargetPos[joint_name])
+        #     i += 1
+        
+        for joint_name, _ in self.frameTranslationFromParent.items():
+            if joint_name not in self.ignore_joints:
+                self.p.resetJointState(self.robot, self.jointIds[joint_name], self.jointTargetPos[joint_name])
+
         self.p.stepSimulation()
         self.drawDebugLines()
         time.sleep(self.dt)
@@ -515,13 +541,14 @@ kukaId
         # all IK iterations (optional).
 
         #initial parameters
-        iterNum = 25
+        iterNum = 100
         eff_pos = self.getJointPosition(jointName=endEffector).T[0]  # dim: 3 * 1
         self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition))
         self.plot_time_dp.append(time.process_time())
 
         # inverse kinematics
         current_q = []
+
         for joint_name in self.chain_dict[endEffector]:
             if joint_name == 'RHAND' or joint_name == 'LHAND':
                 continue
@@ -533,6 +560,8 @@ kukaId
         if path is not None:
             step_positions = path
             iterNum = len(path)
+        
+        old_x_real = list()
 
         for step in range(1, iterNum):
             current_target = step_positions[step]
@@ -546,12 +575,16 @@ kukaId
 
             # moving by DP
             new_x_real = list()
-            for _ in range(200):
-                if len(new_x_real) == 0:
-                    old_x_real = current_q
-                else:
-                    old_x_real = new_x_real
-                new_x_real = self.tick(endEffector, current_q, old_x_real)
+            # for _ in range(200):
+            #     if len(new_x_real) == 0:
+            #         old_x_real = current_q
+            #     else:
+            #         old_x_real = new_x_real
+            if len(new_x_real) == 0:
+                old_x_real = current_q
+            else:
+                old_x_real = new_x_real
+            new_x_real = self.tick(endEffector, current_q, old_x_real)
 
             # check the position of effector after moving with PD
             eff_pos = self.getJointPosition(jointName=endEffector).T[0]
@@ -567,6 +600,125 @@ kukaId
                 break
 
         return np.array(self.plot_time_dp), np.array(self.plot_distance_dp)
+    
+    def move_with_PD_dual_joint(self, leftEndEffector, leftTargetPosition, leftOrientation=None, rightEndEffector=None, rightTargetPosition=None, \
+            rightOrientation=None, speed=0.01, threshold=1e-3, maxIter=100, debug=False, verbose=False, iterNum=25):
+
+        eff_left_pos = self.getJointPosition(jointName=leftEndEffector).T[0]
+        eff_left_orientation = self.getJointOrientation(jointName=leftEndEffector)
+        eff_left_config = np.concatenate((eff_left_pos, eff_left_orientation), axis=0)
+
+        if rightEndEffector is not None:
+
+            eff_right_pos = self.getJointPosition(jointName=rightEndEffector).T[0]
+            eff_right_orientation = self.getJointOrientation(jointName=rightEndEffector)
+            eff_right_config = np.concatenate((eff_right_pos, eff_right_orientation), axis=0)
+
+        # plot
+        plot_left_distance, plot_right_distance, plot_time = [], [], []
+
+        # initialize current_q
+        left_current_q, right_current_q = list(), list()
+        total_current_q = []
+
+        for joint_name, _ in self.frameTranslationFromParent.items():
+            if joint_name not in self.ignore_joints:
+                joint_angle = self.getJointPos(jointName=joint_name)
+                left_current_q.append(joint_angle)
+                right_current_q.append(joint_angle)
+                total_current_q.append(joint_angle)
+        
+
+        left_step_positions = np.linspace(start=eff_left_pos, stop=leftTargetPosition, num=iterNum)
+
+        if rightEndEffector is not None:
+            right_step_positions = np.linspace(start=eff_right_pos, stop=rightTargetPosition, num=iterNum)
+        left_new_x_real, left_old_x_real, right_new_x_real, right_old_x_real = [], [], [], []
+        total_new_x_real, total_old_x_real = [], []
+
+        for step in range(1, iterNum):
+            if leftOrientation is not None:
+                left_current_target = np.concatenate((left_step_positions[step], leftOrientation), axis=0)
+            else:
+                left_current_target = np.concatenate((left_step_positions[step], eff_left_orientation), axis=0)
+
+            if rightOrientation is not None:
+                right_current_target = np.concatenate((right_step_positions[step], rightOrientation), axis=0)
+            else:
+                if rightEndEffector is not None:
+                    right_current_target = np.concatenate((right_step_positions[step], eff_right_orientation), axis=0)
+
+
+            dy_left = left_current_target - eff_left_config
+            J_left = self.jacobianMatrix6(leftEndEffector)
+            d_theta_left = np.linalg.pinv(J_left).dot(dy_left)
+            left_current_q += d_theta_left
+            total_current_q += d_theta_left
+
+            if rightEndEffector is not None:
+                dy_right = right_current_target - eff_right_config
+                J_right = self.jacobianMatrix6(rightEndEffector)
+                d_theta_right = np.linalg.pinv(J_right).dot(dy_right)
+                right_current_q += d_theta_right
+                total_current_q += d_theta_right
+
+            # moving by DP
+            # for _ in range(100):
+            #     if len(left_new_x_real) == 0:
+            #         left_old_x_real = left_current_q
+            #     else:
+            #         left_old_x_real = left_new_x_real
+                
+            #     if rightEndEffector is not None:
+            #         if len(right_new_x_real) == 0:
+            #             right_old_x_real = right_current_q
+            #         else:
+            #             right_old_x_real = right_new_x_real
+
+            #     left_new_x_real = self.tick(left_current_q, left_old_x_real)
+
+            #     if rightEndEffector is not None:
+            #         right_new_x_real = self.tick(right_current_q, right_old_x_real)
+
+            for _ in range(100):
+                if len(total_new_x_real) == 0:
+                    total_old_x_real = total_current_q
+                else:
+                    total_old_x_real = total_new_x_real
+
+                total_new_x_real = self.tick(total_current_q, total_old_x_real)
+            
+            # check the position of effector after moving with PD
+            eff_left_pos = self.getJointPosition(jointName=leftEndEffector).T[0]
+            eff_left_orientation = self.getJointOrientation(jointName=leftEndEffector)
+            eff_left_config = np.concatenate((eff_left_pos, eff_left_orientation), axis=0)
+
+            if rightEndEffector is not None:
+                eff_right_pos = self.getJointPosition(jointName=rightEndEffector).T[0]
+                eff_right_orientation = self.getJointOrientation(jointName=rightEndEffector)
+                eff_right_config = np.concatenate((eff_right_pos, eff_right_orientation), axis=0)
+
+            # print(np.linalg.norm(eff_pos - current_target))
+            print('left hand', np.linalg.norm(eff_left_pos - leftTargetPosition))
+            if rightEndEffector is not None:
+                print('right hand', np.linalg.norm(eff_right_pos - rightTargetPosition))
+
+            plot_left_distance.append(np.linalg.norm(eff_left_pos - leftTargetPosition))
+            if rightEndEffector is not None:
+                plot_right_distance.append(np.linalg.norm(eff_right_pos - rightTargetPosition))
+            plot_time.append(time.process_time())
+
+            if rightEndEffector is not None:
+                if np.linalg.norm(eff_left_pos - leftTargetPosition) < threshold:
+                    print('stop')
+                    break
+            else:
+                if np.linalg.norm(eff_left_pos - leftTargetPosition) < threshold:
+                    print('stop')
+                    break
+
+        return plot_left_distance, plot_right_distance, plot_time
+
 
     def move_with_PD6(self, endEffector, targetPosition=None, orientation=None, path=None, speed=0.01,
         threshold=1e-3, maxIter=100, debug=False, verbose=False):
@@ -586,7 +738,7 @@ kukaId
         # all IK iterations (optional).
 
         #initial parameters
-        iterNum = 50
+        iterNum = 20
         eff_pos = self.getJointPosition(jointName=endEffector).T[0]  # dim: 1 * 3
         eff_orientation = self.getJointOrientation(jointName=endEffector) # dim: 1 * 3
         eff_config = np.concatenate((eff_pos, eff_orientation), axis=0)
@@ -595,19 +747,30 @@ kukaId
 
         # inverse kinematics
         current_q = []
-        for joint_name in self.chain_dict[endEffector]:
-            if joint_name == 'RHAND' or joint_name == 'LHAND':
-                continue
-            joint_angle = self.getJointPos(jointName=joint_name) 
-            current_q.append(joint_angle)
+
+        for joint_name, _ in self.frameTranslationFromParent.items():
+            if joint_name not in self.ignore_joints:
+                joint_angle = self.getJointPos(jointName=joint_name)
+                current_q.append(joint_angle)
+        # for joint_name in self.chain_dict[endEffector]:
+        #     if joint_name == 'RHAND' or joint_name == 'LHAND':
+        #         continue
+        #     joint_angle = self.getJointPos(jointName=joint_name) 
+        #     current_q.append(joint_angle)
         
         step_positions = np.linspace(start=eff_pos, stop=targetPosition, num=iterNum)
         if path is not None:
             step_positions = path
             iterNum = len(path)
+        
+        new_x_real, old_x_real = [], []
 
         for step in range(1, iterNum):
-            current_target = np.concatenate((step_positions[step], orientation), axis=0)
+            if orientation is not None:
+                current_target = np.concatenate((step_positions[step], orientation), axis=0)
+            else:
+                current_target = np.concatenate((step_positions[step], eff_orientation), axis=0)
+
 
             dy = current_target - eff_config
             J = self.jacobianMatrix6(endEffector)
@@ -617,13 +780,13 @@ kukaId
             current_q += d_theta
 
             # moving by DP
-            new_x_real = list()
-            for _ in range(150):
+            for _ in range(60):
                 if len(new_x_real) == 0:
                     old_x_real = current_q
                 else:
                     old_x_real = new_x_real
-                new_x_real = self.tick(endEffector, current_q, old_x_real)
+
+                new_x_real = self.tick(current_q, old_x_real)
 
             # check the position of effector after moving with PD
             eff_pos = self.getJointPosition(jointName=endEffector).T[0]
@@ -639,68 +802,72 @@ kukaId
             if np.linalg.norm(eff_pos - targetPosition) < threshold:
                 print('stop')
                 break
-
+            
         return np.array(self.plot_time_dp), np.array(self.plot_distance_dp)
 
-    def tick(self, endEffector, theta_list, old_x_real):
+    def tick(self, theta_list, old_x_real):
         """Ticks one step of simulation using PD control."""
         # Iterate through all joints and update joint states using PD control.
         # for joint in self.joints:
         new_x_real = []
 
         i = 0
-        for joint in self.chain_dict[endEffector]:
-            integral = 0
-            x_ref = theta_list[i]  # target angle 
-            
-            x_real = self.getJointPos(joint) # joint angle 
-            new_x_real.append(x_real)
 
-            dx_ref = 0 # target velocity
+        for joint, _ in self.frameTranslationFromParent.items():
+            if joint not in self.ignore_joints:
+                
+        # for joint in self.chain_dict[endEffector]:
+                integral = 0
+                x_ref = theta_list[i]  # target angle 
+                
+                x_real = self.getJointPos(joint) # joint angle 
+                new_x_real.append(x_real)
 
-            # dx_real1 = self.getJointVel(joint) # joint velocity
-            # dx_real2 = (x_real - last_q_list[i]) / self.dt
-            dx_real = (x_real - old_x_real[i]) / self.dt
-            i += 1
-            
+                dx_ref = 0 # target velocity
 
-            # skip dummy joints (world to base joint)
-            jointController = self.jointControllers[joint]
-            if jointController == 'SKIP_THIS_JOINT':
-                continue
+                # dx_real1 = self.getJointVel(joint) # joint velocity
+                # dx_real2 = (x_real - last_q_list[i]) / self.dt
+                dx_real = (x_real - old_x_real[i]) / self.dt
+                i += 1
+                
 
-            # disable joint velocity controller before apply a torque
-            self.disableVelocityController(joint)
+                # skip dummy joints (world to base joint)
+                jointController = self.jointControllers[joint]
+                if jointController == 'SKIP_THIS_JOINT':
+                    continue
 
-            # loads your PID gains
-            kp = self.ctrlConfig[jointController]['pid']['p']
-            ki = self.ctrlConfig[jointController]['pid']['i']
-            kd = self.ctrlConfig[jointController]['pid']['d']
+                # disable joint velocity controller before apply a torque
+                self.disableVelocityController(joint)
 
-            ### Implement your code from here ... ###
-            # TODO: obtain torque from PD controller
-            torque = self.calculateTorque(x_ref, x_real, dx_ref, dx_real, integral, kp, ki, kd)
-            ### ... to here ###
+                # loads your PID gains
+                kp = self.ctrlConfig[jointController]['pid']['p']
+                ki = self.ctrlConfig[jointController]['pid']['i']
+                kd = self.ctrlConfig[jointController]['pid']['d']
 
-            self.p.setJointMotorControl2(
-                bodyIndex=self.robot,
-                jointIndex=self.jointIds[joint],
-                controlMode=self.p.TORQUE_CONTROL,
-                force=torque
-            )
+                ### Implement your code from here ... ###
+                # TODO: obtain torque from PD controller
+                torque = self.calculateTorque(x_ref, x_real, dx_ref, dx_real, integral, kp, ki, kd)
+                ### ... to here ###
 
-            # Gravity compensation
-            # A naive gravitiy compensation is provided for you
-            # If you have embeded a better compensation, feel free to modify
-            compensation = self.jointGravCompensation[joint]
-            self.p.applyExternalForce(
-                objectUniqueId=self.robot,
-                linkIndex=self.jointIds[joint],
-                forceObj=[0, 0, -compensation],
-                posObj=self.getLinkCoM(joint),
-                flags=self.p.WORLD_FRAME
-            )
-            # Gravity compensation ends here
+                self.p.setJointMotorControl2(
+                    bodyIndex=self.robot,
+                    jointIndex=self.jointIds[joint],
+                    controlMode=self.p.TORQUE_CONTROL,
+                    force=torque
+                )
+
+                # Gravity compensation
+                # A naive gravitiy compensation is provided for you
+                # If you have embeded a better compensation, feel free to modify
+                compensation = self.jointGravCompensation[joint]
+                self.p.applyExternalForce(
+                    objectUniqueId=self.robot,
+                    linkIndex=self.jointIds[joint],
+                    forceObj=[0, 0, -compensation],
+                    posObj=self.getLinkCoM(joint),
+                    flags=self.p.WORLD_FRAME
+                )
+                # Gravity compensation ends here
 
         self.p.stepSimulation()
         self.drawDebugLines()
@@ -740,8 +907,9 @@ kukaId
     #     points = self.cubic_interpolation()        
     #     pass
     
-    def selfDockingToPosition(self, points, endEffector):
-        path = self.cubic_interpolation(points)
+    def selfDockingToPosition(self, leftEndEffector, leftTargetPosition, leftOrientation=None, rightEndEffector=None, rightTargetPosition=None, \
+            rightOrientation=None, speed=0.01, threshold=1e-3, maxIter=100, debug=False, verbose=False, iterNum=25):
+        # path = self.cubic_interpolation(points)
 
         # plot path
         # from mpl_toolkits.mplot3d import Axes3D
@@ -749,15 +917,15 @@ kukaId
         # ax = fig.add_subplot(111, projection='3d')
         # ax.scatter(path[:,0], path[:,1], path[:,2])
         # plt.show()
-
-        orientation = [1, 0, 0]
-        self.move_with_PD6(endEffector, targetPosition=path[-1], orientation=orientation, path=path)
+        self.move_with_PD_dual_joint(leftEndEffector, leftTargetPosition, leftOrientation=leftOrientation, rightEndEffector=rightEndEffector, rightTargetPosition=rightTargetPosition, rightOrientation=rightOrientation, \
+            threshold=1e-3, iterNum=iterNum)
 
 
     # Task 3.2 Grasping & Docking
-    def clamp(self, leftTargetAngle, rightTargetAngle, angularSpeed=0.005, threshold=1e-1, maxIter=300, verbose=False):
+    def clamp(self, leftEndEffector, leftTargetPosition, leftOrientation=None, rightEndEffector=None, rightTargetPosition=None, \
+            rightOrientation=None, speed=0.01, threshold=1e-3, maxIter=100, debug=False, verbose=False, iterNum=25):
         """A template function for you, you are free to use anything else"""
-        # TODO: Append your code here
-        pass
+        self.move_with_PD_dual_joint(leftEndEffector, leftTargetPosition, leftOrientation=leftOrientation, rightEndEffector=rightEndEffector, rightTargetPosition=rightTargetPosition, rightOrientation=rightOrientation, \
+            threshold=1e-3, iterNum=iterNum)
 
  ### END
