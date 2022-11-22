@@ -49,9 +49,9 @@ sim = Simulation(pybulletConfigs, robotConfigs)
 
 # test move_with_PD ==========================
 endEffector = "LARM_JOINT5"
-targetPosition = np.array([0.2, 0.3, 1])  # x,y,z coordinates in world frame
+targetPosition = np.array([0.33, 0, 1.05])  # x,y,z coordinates in world frame
 
-pltTime, pltEFPosition = sim.move_with_PD6(endEffector, targetPosition, speed=0.01, threshold=1e-3, maxIter=100, orientation=None, debug=False, verbose=False)
+pltDistance, _, pltTime = sim.move_with_PD_dual_joint(leftEndEffector=endEffector, leftTargetPosition=targetPosition, speed=0.01, threshold=1e-3, maxIter=100, debug=False, verbose=False)
 
 # Now plot some graphs
 task2_figure_name = "move_with_PD.png"
@@ -61,8 +61,8 @@ task2_savefig = True
 fig = plt.figure(figsize=(6, 4))
 
 print('pltTime', pltTime)
-print('plotEffPosition', pltEFPosition)
-plt.plot(pltTime, pltEFPosition, color='blue')
+print('plotEffPosition', pltDistance)
+plt.plot(pltTime, pltDistance, color='blue')
 plt.xlabel("Time s")
 plt.ylabel("Distance to target position")
 

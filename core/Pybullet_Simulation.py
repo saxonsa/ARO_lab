@@ -600,6 +600,125 @@ kukaId
                 break
 
         return np.array(self.plot_time_dp), np.array(self.plot_distance_dp)
+    
+    def move_with_PD_dual_joint(self, leftEndEffector, leftTargetPosition, leftOrientation=None, rightEndEffector=None, rightTargetPosition=None, \
+            rightOrientation=None, speed=0.01, threshold=1e-3, maxIter=100, debug=False, verbose=False, iterNum=25):
+
+        eff_left_pos = self.getJointPosition(jointName=leftEndEffector).T[0]
+        eff_left_orientation = self.getJointOrientation(jointName=leftEndEffector)
+        eff_left_config = np.concatenate((eff_left_pos, eff_left_orientation), axis=0)
+
+        if rightEndEffector is not None:
+
+            eff_right_pos = self.getJointPosition(jointName=rightEndEffector).T[0]
+            eff_right_orientation = self.getJointOrientation(jointName=rightEndEffector)
+            eff_right_config = np.concatenate((eff_right_pos, eff_right_orientation), axis=0)
+
+        # plot
+        plot_left_distance, plot_right_distance, plot_time = [], [], []
+
+        # initialize current_q
+        left_current_q, right_current_q = list(), list()
+        total_current_q = []
+
+        for joint_name, _ in self.frameTranslationFromParent.items():
+            if joint_name not in self.ignore_joints:
+                joint_angle = self.getJointPos(jointName=joint_name)
+                left_current_q.append(joint_angle)
+                right_current_q.append(joint_angle)
+                total_current_q.append(joint_angle)
+        
+
+        left_step_positions = np.linspace(start=eff_left_pos, stop=leftTargetPosition, num=iterNum)
+
+        if rightEndEffector is not None:
+            right_step_positions = np.linspace(start=eff_right_pos, stop=rightTargetPosition, num=iterNum)
+        left_new_x_real, left_old_x_real, right_new_x_real, right_old_x_real = [], [], [], []
+        total_new_x_real, total_old_x_real = [], []
+
+        for step in range(1, iterNum):
+            if leftOrientation is not None:
+                left_current_target = np.concatenate((left_step_positions[step], leftOrientation), axis=0)
+            else:
+                left_current_target = np.concatenate((left_step_positions[step], eff_left_orientation), axis=0)
+
+            if rightOrientation is not None:
+                right_current_target = np.concatenate((right_step_positions[step], rightOrientation), axis=0)
+            else:
+                if rightEndEffector is not None:
+                    right_current_target = np.concatenate((right_step_positions[step], eff_right_orientation), axis=0)
+
+
+            dy_left = left_current_target - eff_left_config
+            J_left = self.jacobianMatrix6(leftEndEffector)
+            d_theta_left = np.linalg.pinv(J_left).dot(dy_left)
+            left_current_q += d_theta_left
+            total_current_q += d_theta_left
+
+            if rightEndEffector is not None:
+                dy_right = right_current_target - eff_right_config
+                J_right = self.jacobianMatrix6(rightEndEffector)
+                d_theta_right = np.linalg.pinv(J_right).dot(dy_right)
+                right_current_q += d_theta_right
+                total_current_q += d_theta_right
+
+            # moving by DP
+            # for _ in range(100):
+            #     if len(left_new_x_real) == 0:
+            #         left_old_x_real = left_current_q
+            #     else:
+            #         left_old_x_real = left_new_x_real
+                
+            #     if rightEndEffector is not None:
+            #         if len(right_new_x_real) == 0:
+            #             right_old_x_real = right_current_q
+            #         else:
+            #             right_old_x_real = right_new_x_real
+
+            #     left_new_x_real = self.tick(left_current_q, left_old_x_real)
+
+            #     if rightEndEffector is not None:
+            #         right_new_x_real = self.tick(right_current_q, right_old_x_real)
+
+            for _ in range(60):
+                if len(total_new_x_real) == 0:
+                    total_old_x_real = total_current_q
+                else:
+                    total_old_x_real = total_new_x_real
+
+                total_new_x_real = self.tick(total_current_q, total_old_x_real)
+            
+            # check the position of effector after moving with PD
+            eff_left_pos = self.getJointPosition(jointName=leftEndEffector).T[0]
+            eff_left_orientation = self.getJointOrientation(jointName=leftEndEffector)
+            eff_left_config = np.concatenate((eff_left_pos, eff_left_orientation), axis=0)
+
+            if rightEndEffector is not None:
+                eff_right_pos = self.getJointPosition(jointName=rightEndEffector).T[0]
+                eff_right_orientation = self.getJointOrientation(jointName=rightEndEffector)
+                eff_right_config = np.concatenate((eff_right_pos, eff_right_orientation), axis=0)
+
+            # print(np.linalg.norm(eff_pos - current_target))
+            print('left hand', np.linalg.norm(eff_left_pos - leftTargetPosition))
+            if rightEndEffector is not None:
+                print('right hand', np.linalg.norm(eff_right_pos - rightTargetPosition))
+
+            plot_left_distance.append(np.linalg.norm(eff_left_pos - leftTargetPosition))
+            if rightEndEffector is not None:
+                plot_right_distance.append(np.linalg.norm(eff_right_pos - rightTargetPosition))
+            plot_time.append(time.process_time())
+
+            if rightEndEffector is not None:
+                if np.linalg.norm(eff_left_pos - leftTargetPosition) < threshold:
+                    print('stop')
+                    break
+            else:
+                if np.linalg.norm(eff_left_pos - leftTargetPosition) < threshold:
+                    print('stop')
+                    break
+
+        return plot_left_distance, plot_right_distance, plot_time
+
 
     def move_with_PD6(self, endEffector, targetPosition=None, orientation=None, path=None, speed=0.01,
         threshold=1e-3, maxIter=100, debug=False, verbose=False):
@@ -788,8 +907,9 @@ kukaId
     #     points = self.cubic_interpolation()        
     #     pass
     
-    def selfDockingToPosition(self, points, endEffector):
-        path = self.cubic_interpolation(points)
+    def selfDockingToPosition(self, leftEndEffector, leftTargetPosition, leftOrientation=None, rightEndEffector=None, rightTargetPosition=None, \
+            rightOrientation=None, speed=0.01, threshold=1e-3, maxIter=100, debug=False, verbose=False, iterNum=25):
+        # path = self.cubic_interpolation(points)
 
         # plot path
         # from mpl_toolkits.mplot3d import Axes3D
@@ -797,14 +917,15 @@ kukaId
         # ax = fig.add_subplot(111, projection='3d')
         # ax.scatter(path[:,0], path[:,1], path[:,2])
         # plt.show()
-
-        self.move_with_PD6(endEffector, targetPosition=path[-1], path=path)
+        self.move_with_PD_dual_joint(leftEndEffector, leftTargetPosition, leftOrientation=leftOrientation, rightEndEffector=rightEndEffector, rightTargetPosition=rightTargetPosition, rightOrientation=rightOrientation, \
+            threshold=1e-3, iterNum=iterNum)
 
 
     # Task 3.2 Grasping & Docking
-    def clamp(self, leftTargetAngle, rightTargetAngle, angularSpeed=0.005, threshold=1e-1, maxIter=300, verbose=False):
+    def clamp(self, leftEndEffector, leftTargetPosition, leftOrientation=None, rightEndEffector=None, rightTargetPosition=None, \
+            rightOrientation=None, speed=0.01, threshold=1e-3, maxIter=100, debug=False, verbose=False, iterNum=25):
         """A template function for you, you are free to use anything else"""
-        # TODO: Append your code here
-        pass
+        self.move_with_PD_dual_joint(leftEndEffector, leftTargetPosition, leftOrientation=leftOrientation, rightEndEffector=rightEndEffector, rightTargetPosition=rightTargetPosition, rightOrientation=rightOrientation, \
+            threshold=1e-3, iterNum=iterNum)
 
  ### END

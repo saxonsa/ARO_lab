@@ -40,7 +40,7 @@ robotConfigs = {
     "robotPIDConfigs": core_path + "/PD_gains.yaml",
     "robotStartPos": [0, 0, 0.85],
     "robotStartOrientation": [0, 0, 0, 1],
-    "fixedBase": False,
+    "fixedBase": True,
     "colored": True
 }
 
@@ -90,76 +90,56 @@ def getReadyForTask():
 
 
 def solution():
-# {
-#             'endEffector': 'LARM_JOINT5',
-#             'targetPosition': [0.15, 0.15, 0.95]
-#         },
-#         {
-#             'endEffector': 'RARM_JOINT5',
-#             'targetPosition': [0.25, -0.15, 0.95]
-#         },
+
     paths = [
-        # yaobai
         {
-            'endEffector': 'LARM_JOINT5',
-            'targetPosition': [0.22, 0.25, 1.05]
+            'left': 'LARM_JOINT5',
+            'leftTargetPosition': [0.20, 0.23, 1.03],
+            'right': 'RARM_JOINT5',
+            'rightTargetPosition': [0.20, -0.23, 1.03],
+            'iterNum': 25
         },
         {
-            'endEffector': 'RARM_JOINT5',
-            'targetPosition': [0.35, -0.20, 1.05]
+            'left': 'LARM_JOINT5',
+            'leftTargetPosition': [0.24, 0.12, 1.03],
+            'right': 'RARM_JOINT5',
+            'iterNum': 25
         },
-        {
-            'endEffector': 'LARM_JOINT5',
-            'targetPosition': [0.20, 0.15, 0.95]
-        },
-        {
-            'endEffector': 'RARM_JOINT5',
-            'targetPosition': [0.22, -0.12, 0.95]
-        },
-        {
-            'endEffector': 'LARM_JOINT5',
-            'targetPosition': [0.23, 0.08, 0.93]
-        },
-        {
-            'endEffector': 'RARM_JOINT5',
-            'targetPosition': [0.24, -0.08, 0.93]
-        },
-        {
-            'endEffector': 'RARM_JOINT5',
-            'targetPosition': [0.30, -0.06, 0.92]
-        },
-        {
-            'endEffector': 'LARM_JOINT5',
-            'targetPosition': [0.40, 0.06, 0.92]
-        },
-        {
-            'endEffector': 'RARM_JOINT5',
-            'targetPosition': [0.42, -0.04, 0.92]
-        },
-        {
-            'endEffector': 'LARM_JOINT5',
-            'targetPosition': [0.45, 0.04, 0.92]
-        },
-        {
-            'endEffector': 'RARM_JOINT5',
-            'targetPosition': [0.43, -0.03, 0.92]
+         {
+            'left': 'LARM_JOINT5',
+            'leftTargetPosition': [0.24, 0.12, 1.03],
+            'right': 'RARM_JOINT5',
+            'rightTargetPosition': [0.24, -0.12, 1.03],
+            'iterNum': 25
         },
         # {
-        #     'endEffector': 'LARM_JOINT5',
-        #     'targetPosition': [0.50, 0.03, 0.92]
+        #     'left': 'LARM_JOINT5',
+        #     'leftTargetPosition': [0.24, 0.10, 0.98],
+        #     'right': 'RARM_JOINT5',
+        #     'rightTargetPosition': [0.24, -0.10, 0.98],
+        #     'iterNum': 10
+        # },
+        #     {
+        #     'left': 'LARM_JOINT5',
+        #     'leftTargetPosition': [0.22, 0.10, 0.97],
+        #     'right': 'RARM_JOINT5',
+        #     'rightTargetPosition': [0.22, -0.10, 0.97],
+        #     'iterNum': 25
         # },
         # {
-        #     'endEffector': 'LARM_JOINT5',
-        #     'targetPosition': [0.20, 0.12, 1.0]
+        #     'left': 'LARM_JOINT5',
+        #     'leftTargetPosition': [0.22, 0.095, 0.93],
+        #     'right': 'RARM_JOINT5',
+        #     'rightTargetPosition': [0.22, -0.095, 0.93],
+        #     'iterNum': 10
         # },
     ]
 
     for path in paths:
-        armPos = sim.getJointPosition(path['endEffector']).T[0]
-        points = np.array([armPos, path['targetPosition']])
-
-        sim.selfDockingToPosition(points, path['endEffector'])
-
+        sim.selfDockingToPosition(leftEndEffector=path['left'], leftTargetPosition=path['leftTargetPosition'], leftOrientation=path['leftOrientation'], rightEndEffector=path['right'], rightTargetPosition=path['rightTargetPosition'], rightOrientation=path['rightOrientation'], iterNum=path['iterNum'])
+    
+    # _ = sim.moveJoint(
+    #     'LARM_JOINT5', np.deg2rad(10), 0.0, False)
 
     # TODO: Add your code hereorientation
     
