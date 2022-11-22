@@ -680,7 +680,7 @@ kukaId
             #     if rightEndEffector is not None:
             #         right_new_x_real = self.tick(right_current_q, right_old_x_real)
 
-            for _ in range(60):
+            for _ in range(100):
                 if len(total_new_x_real) == 0:
                     total_old_x_real = total_current_q
                 else:

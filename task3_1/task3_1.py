@@ -48,6 +48,7 @@ sim = Simulation(pybulletConfigs, robotConfigs)
 
 ##### Please leave this function unchanged, feel free to modify others #####
 def getReadyForTask():
+    
     global finalTargetPos
     # compile urdfs
     finalTargetPos = np.array([0.7, 0.00, 0.91])
@@ -86,6 +87,9 @@ def getReadyForTask():
         # sim.tick()
         time.sleep(1./1000)
 
+    print('distance!!', sim.p.getBasePositionAndOrientation(cubeId)[0])
+    
+
     return tableId, cubeId, targetId
 
 
@@ -103,46 +107,46 @@ def solution():
             'left': 'LARM_JOINT5',
             'leftTargetPosition': [0.24, 0.12, 1.03],
             'right': 'RARM_JOINT5',
-            'iterNum': 25
-        },
-         {
-            'left': 'LARM_JOINT5',
-            'leftTargetPosition': [0.24, 0.12, 1.03],
-            'right': 'RARM_JOINT5',
             'rightTargetPosition': [0.24, -0.12, 1.03],
             'iterNum': 25
         },
-        # {
-        #     'left': 'LARM_JOINT5',
-        #     'leftTargetPosition': [0.24, 0.10, 0.98],
-        #     'right': 'RARM_JOINT5',
-        #     'rightTargetPosition': [0.24, -0.10, 0.98],
-        #     'iterNum': 10
-        # },
-        #     {
-        #     'left': 'LARM_JOINT5',
-        #     'leftTargetPosition': [0.22, 0.10, 0.97],
-        #     'right': 'RARM_JOINT5',
-        #     'rightTargetPosition': [0.22, -0.10, 0.97],
-        #     'iterNum': 25
-        # },
-        # {
-        #     'left': 'LARM_JOINT5',
-        #     'leftTargetPosition': [0.22, 0.095, 0.93],
-        #     'right': 'RARM_JOINT5',
-        #     'rightTargetPosition': [0.22, -0.095, 0.93],
-        #     'iterNum': 10
-        # },
+        {
+            'left': 'LARM_JOINT5',
+            'leftTargetPosition': [0.24, 0.10, 0.98],
+            'right': 'RARM_JOINT5',
+            'rightTargetPosition': [0.24, -0.10, 0.98],
+            'iterNum': 10
+        },
+            {
+            'left': 'LARM_JOINT5',
+            'leftTargetPosition': [0.22, 0.10, 0.97],
+            'right': 'RARM_JOINT5',
+            'rightTargetPosition': [0.22, -0.10, 0.97],
+            'iterNum': 25
+        },
+        {
+            'left': 'LARM_JOINT5',
+            'leftTargetPosition': [0.22, 0.085, 0.95],
+            'right': 'RARM_JOINT5',
+            'rightTargetPosition': [0.22, -0.085, 0.95],
+            'iterNum': 10
+        },
+        {
+            'left': 'LARM_JOINT5',
+            'leftTargetPosition': [0.591, 0.0417, 0.9265],
+            'right': 'RARM_JOINT5',
+            'rightTargetPosition': [0.591, -0.0417, 0.9265],
+            'iterNum': 32
+        },
     ]
 
     for path in paths:
-        sim.selfDockingToPosition(leftEndEffector=path['left'], leftTargetPosition=path['leftTargetPosition'], leftOrientation=path['leftOrientation'], rightEndEffector=path['right'], rightTargetPosition=path['rightTargetPosition'], rightOrientation=path['rightOrientation'], iterNum=path['iterNum'])
+        sim.selfDockingToPosition(leftEndEffector=path['left'], leftTargetPosition=path['leftTargetPosition'], rightEndEffector=path['right'], rightTargetPosition=path['rightTargetPosition'], iterNum=path['iterNum'])
     
-    # _ = sim.moveJoint(
-    #     'LARM_JOINT5', np.deg2rad(10), 0.0, False)
-
-    # TODO: Add your code hereorientation
-    
+    # test current position: 0.01973340798318625
+    cubic_position = sim.p.getBasePositionAndOrientation(cubeId)[0]
+    target_position = sim.p.getBasePositionAndOrientation(targetId)[0]
+    print('distance', np.linalg.norm(np.asarray(cubic_position) - np.asarray(target_position)))
 
 tableId, cubeId, targetId = getReadyForTask()
 
