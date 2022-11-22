@@ -100,6 +100,7 @@ class Simulation(Simulation_base):
     plot_distance = []
     plot_time_dp = []
     plot_distance_dp = []
+    ignore_joints = ['base_to_dummy', 'base_to_waist', 'RHAND', 'LHAND']
 
     def getJointRotationalMatrix(self, jointName=None, theta=None):
         """
@@ -256,26 +257,48 @@ kukaId
         J = []  # 3 * n
         joint_chain = self.chain_dict[endEffector]
         pos_eff = self.getJointPosition(endEffector).T[0]
-
-        for jointName in joint_chain:
-            if jointName == endEffector:
-                rotationAxis = self.jointRotationAxis[jointName]
-                J.append(np.cross(rotationAxis, pos_eff))
-                # J.append(np.cross(rotationAxis, [0, 0, 0]))
+        
+        for jointName, _ in self.frameTranslationFromParent.items():
+            if jointName in self.ignore_joints:
                 continue
-            rotationAxis = self.jointRotationAxis[jointName]  # dim: 1 * 3
-            jointPos = self.getJointPosition(jointName).T[0]  # pos, dim: 1 * 3, ([a, b, c])
-            J.append(np.cross(rotationAxis, (pos_eff - jointPos)))
+            elif jointName not in joint_chain:
+                J.append(np.array([0, 0, 0]))
+            else:
+                rotationAxis = self.jointRotationAxis[jointName]  # dim: 1 * 3
+                jointPos = self.getJointPosition(jointName).T[0]  # pos, dim: 1 * 3, ([a, b, c])
+                J.append(np.cross(rotationAxis, (pos_eff - jointPos)))
+
+        # for jointName in joint_chain:
+        #     if jointName == endEffector:
+        #         rotationAxis = self.jointRotationAxis[jointName]
+        #         J.append(np.cross(rotationAxis, pos_eff))
+        #         # J.append(np.cross(rotationAxis, [0, 0, 0]))
+        #         continue
+        #     rotationAxis = self.jointRotationAxis[jointName]  # dim: 1 * 3
+        #     jointPos = self.getJointPosition(jointName).T[0]  # pos, dim: 1 * 3, ([a, b, c])
+        #     J.append(np.cross(rotationAxis, (pos_eff - jointPos)))
 
         J = np.array(J).T
 
         J_O = []
-        for jointName in joint_chain:
-            # endeffect axies 
-            rotationAxis = self.jointRotationAxis[jointName]
-            a_effector = self.jointRotationAxis[endEffector]
-            jointOrientation = np.cross(rotationAxis, a_effector)
-            J_O.append(jointOrientation)
+
+        for jointName, _ in self.frameTranslationFromParent.items():
+            if jointName in self.ignore_joints:
+                continue
+            elif jointName not in joint_chain:
+                J_O.append(np.array([0, 0, 0]))
+            else:
+                rotationAxis = self.jointRotationAxis[jointName]
+                a_effector = self.jointRotationAxis[endEffector]
+                jointOrientation = np.cross(rotationAxis, a_effector)
+                J_O.append(jointOrientation)
+
+        # for jointName in joint_chain:
+        #     # endeffect axies 
+        #     rotationAxis = self.jointRotationAxis[jointName]
+        #     a_effector = self.jointRotationAxis[endEffector]
+        #     jointOrientation = np.cross(rotationAxis, a_effector)
+        #     J_O.append(jointOrientation)
         
         J_O = np.array(J_O).T
 
@@ -302,11 +325,18 @@ kukaId
         current_q = []
         eff_config, eff_orientation, eff_pos = None, None, None
 
-        for joint_name in self.chain_dict[endEffector]:
-            if joint_name == 'RHAND' or joint_name == 'LHAND':
+        for joint_name, _ in self.frameTranslationFromParent.items():
+            if joint_name in self.ignore_joints:
                 continue
-            joint_angle = self.getJointPos(jointName=joint_name) 
-            current_q.append(joint_angle)
+            else:
+                joint_angle = self.getJointPos(jointName=joint_name) 
+                current_q.append(joint_angle)
+
+        # for joint_name in self.chain_dict[endEffector]:
+        #     if joint_name == 'RHAND' or joint_name == 'LHAND':
+        #         continue
+        #     joint_angle = self.getJointPos(jointName=joint_name) 
+        #     current_q.append(joint_angle)
 
         eff_pos = self.getJointPosition(jointName=endEffector).T[0]  # dim: 3 * 1
         eff_config = eff_pos
@@ -334,11 +364,19 @@ kukaId
             current_q = current_q + d_theta
             traj.append(current_q)
 
+            # i = 0
+            # for joint_name in self.chain_dict[endEffector]:
+            #     self.jointTargetPos[joint_name] = current_q[i]
+            #     i += 1
             i = 0
-            for joint_name in self.chain_dict[endEffector]:
-                self.jointTargetPos[joint_name] = current_q[i]
-                i += 1
-                
+            for joint_name, _ in self.frameTranslationFromParent.items():
+                if joint_name in self.ignore_joints:
+                    continue
+                else:
+                    self.jointTargetPos[joint_name] = current_q[i]
+                    i += 1
+            
+
             self.tick_without_PD(endEffector)
             print(np.linalg.norm(eff_pos - targetPosition))
             
@@ -378,10 +416,15 @@ kukaId
         # TODO modify from here
         # Iterate through all joints and update joint states.
             # For each joint, you can use the shared variable self.jointTargetPos.
-        i = 0
-        for joint_name in self.chain_dict[endEffector]:
-            self.p.resetJointState(self.robot, self.jointIds[joint_name], self.jointTargetPos[joint_name])
-            i += 1
+        # i = 0
+        # for joint_name in self.chain_dict[endEffector]:
+        #     self.p.resetJointState(self.robot, self.jointIds[joint_name], self.jointTargetPos[joint_name])
+        #     i += 1
+        
+        for joint_name, _ in self.frameTranslationFromParent.items():
+            if joint_name not in self.ignore_joints:
+                self.p.resetJointState(self.robot, self.jointIds[joint_name], self.jointTargetPos[joint_name])
+
         self.p.stepSimulation()
         self.drawDebugLines()
         time.sleep(self.dt)
@@ -505,6 +548,7 @@ kukaId
 
         # inverse kinematics
         current_q = []
+
         for joint_name in self.chain_dict[endEffector]:
             if joint_name == 'RHAND' or joint_name == 'LHAND':
                 continue
@@ -584,11 +628,16 @@ kukaId
 
         # inverse kinematics
         current_q = []
-        for joint_name in self.chain_dict[endEffector]:
-            if joint_name == 'RHAND' or joint_name == 'LHAND':
-                continue
-            joint_angle = self.getJointPos(jointName=joint_name) 
-            current_q.append(joint_angle)
+
+        for joint_name, _ in self.frameTranslationFromParent.items():
+            if joint_name not in self.ignore_joints:
+                joint_angle = self.getJointPos(jointName=joint_name)
+                current_q.append(joint_angle)
+        # for joint_name in self.chain_dict[endEffector]:
+        #     if joint_name == 'RHAND' or joint_name == 'LHAND':
+        #         continue
+        #     joint_angle = self.getJointPos(jointName=joint_name) 
+        #     current_q.append(joint_angle)
         
         step_positions = np.linspace(start=eff_pos, stop=targetPosition, num=iterNum)
         if path is not None:
@@ -618,7 +667,7 @@ kukaId
                 else:
                     old_x_real = new_x_real
 
-                new_x_real = self.tick(endEffector, current_q, old_x_real)
+                new_x_real = self.tick(current_q, old_x_real)
 
             # check the position of effector after moving with PD
             eff_pos = self.getJointPosition(jointName=endEffector).T[0]
@@ -637,65 +686,69 @@ kukaId
             
         return np.array(self.plot_time_dp), np.array(self.plot_distance_dp)
 
-    def tick(self, endEffector, theta_list, old_x_real):
+    def tick(self, theta_list, old_x_real):
         """Ticks one step of simulation using PD control."""
         # Iterate through all joints and update joint states using PD control.
         # for joint in self.joints:
         new_x_real = []
 
         i = 0
-        for joint in self.chain_dict[endEffector]:
-            integral = 0
-            x_ref = theta_list[i]  # target angle 
-            
-            x_real = self.getJointPos(joint) # joint angle 
-            new_x_real.append(x_real)
 
-            dx_ref = 0 # target velocity
+        for joint, _ in self.frameTranslationFromParent.items():
+            if joint not in self.ignore_joints:
+                
+        # for joint in self.chain_dict[endEffector]:
+                integral = 0
+                x_ref = theta_list[i]  # target angle 
+                
+                x_real = self.getJointPos(joint) # joint angle 
+                new_x_real.append(x_real)
 
-            # dx_real1 = self.getJointVel(joint) # joint velocity
-            # dx_real2 = (x_real - last_q_list[i]) / self.dt
-            dx_real = (x_real - old_x_real[i]) / self.dt
-            i += 1
-            
+                dx_ref = 0 # target velocity
 
-            # skip dummy joints (world to base joint)
-            jointController = self.jointControllers[joint]
-            if jointController == 'SKIP_THIS_JOINT':
-                continue
+                # dx_real1 = self.getJointVel(joint) # joint velocity
+                # dx_real2 = (x_real - last_q_list[i]) / self.dt
+                dx_real = (x_real - old_x_real[i]) / self.dt
+                i += 1
+                
 
-            # disable joint velocity controller before apply a torque
-            self.disableVelocityController(joint)
+                # skip dummy joints (world to base joint)
+                jointController = self.jointControllers[joint]
+                if jointController == 'SKIP_THIS_JOINT':
+                    continue
 
-            # loads your PID gains
-            kp = self.ctrlConfig[jointController]['pid']['p']
-            ki = self.ctrlConfig[jointController]['pid']['i']
-            kd = self.ctrlConfig[jointController]['pid']['d']
+                # disable joint velocity controller before apply a torque
+                self.disableVelocityController(joint)
 
-            ### Implement your code from here ... ###
-            # TODO: obtain torque from PD controller
-            torque = self.calculateTorque(x_ref, x_real, dx_ref, dx_real, integral, kp, ki, kd)
-            ### ... to here ###
+                # loads your PID gains
+                kp = self.ctrlConfig[jointController]['pid']['p']
+                ki = self.ctrlConfig[jointController]['pid']['i']
+                kd = self.ctrlConfig[jointController]['pid']['d']
 
-            self.p.setJointMotorControl2(
-                bodyIndex=self.robot,
-                jointIndex=self.jointIds[joint],
-                controlMode=self.p.TORQUE_CONTROL,
-                force=torque
-            )
+                ### Implement your code from here ... ###
+                # TODO: obtain torque from PD controller
+                torque = self.calculateTorque(x_ref, x_real, dx_ref, dx_real, integral, kp, ki, kd)
+                ### ... to here ###
 
-            # Gravity compensation
-            # A naive gravitiy compensation is provided for you
-            # If you have embeded a better compensation, feel free to modify
-            compensation = self.jointGravCompensation[joint]
-            self.p.applyExternalForce(
-                objectUniqueId=self.robot,
-                linkIndex=self.jointIds[joint],
-                forceObj=[0, 0, -compensation],
-                posObj=self.getLinkCoM(joint),
-                flags=self.p.WORLD_FRAME
-            )
-            # Gravity compensation ends here
+                self.p.setJointMotorControl2(
+                    bodyIndex=self.robot,
+                    jointIndex=self.jointIds[joint],
+                    controlMode=self.p.TORQUE_CONTROL,
+                    force=torque
+                )
+
+                # Gravity compensation
+                # A naive gravitiy compensation is provided for you
+                # If you have embeded a better compensation, feel free to modify
+                compensation = self.jointGravCompensation[joint]
+                self.p.applyExternalForce(
+                    objectUniqueId=self.robot,
+                    linkIndex=self.jointIds[joint],
+                    forceObj=[0, 0, -compensation],
+                    posObj=self.getLinkCoM(joint),
+                    flags=self.p.WORLD_FRAME
+                )
+                # Gravity compensation ends here
 
         self.p.stepSimulation()
         self.drawDebugLines()

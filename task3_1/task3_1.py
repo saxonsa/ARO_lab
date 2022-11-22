@@ -90,25 +90,43 @@ def getReadyForTask():
 
 
 def solution():
-    
-    target_pos = finalTargetPos
+# {
+#             'endEffector': 'LARM_JOINT5',
+#             'targetPosition': [0.15, 0.15, 0.95]
+#         },
+#         {
+#             'endEffector': 'RARM_JOINT5',
+#             'targetPosition': [0.25, -0.15, 0.95]
+#         },
+    paths = [
+        {
+            'endEffector': 'LARM_JOINT5',
+            'targetPosition': [0.22, 0.3, 0.95]
+        },
+        # {
+        #     'endEffector': 'LARM_JOINT5',
+        #     'targetPosition': [0.2, 0.1, 1]
+        # },
+        {
+            'endEffector': 'RARM_JOINT5',
+            'targetPosition': [0.35, -0.20, 0.95]
+        },
+        {
+            'endEffector': 'LARM_JOINT5',
+            'targetPosition': [0.15, 0.15, 0.95]
+        },
+        # {
+        #     'endEffector': 'LARM_JOINT5',
+        #     'targetPosition': finalTargetPos
+        # },
+    ]
 
-    path1 = [0.2, 0.3, 1] # ignore z-axis
+    for path in paths:
+        armPos = sim.getJointPosition(path['endEffector']).T[0]
+        points = np.array([armPos, path['targetPosition']])
 
-    endEffector = 'LARM_JOINT5'
-    left_arm_pos = sim.getJointPosition(endEffector).T[0] 
-    points = np.array([left_arm_pos, path1])
-    sim.selfDockingToPosition(points, endEffector)
+        sim.selfDockingToPosition(points, path['endEffector'])
 
-    path2 = [0.2, 0.1, 1]
-    left_arm_pos = sim.getJointPosition(endEffector).T[0] 
-    points = np.array([left_arm_pos, path2])
-    sim.selfDockingToPosition(points, endEffector)
-
-    path3 = [0.6, 0, 0.85]
-    left_arm_pos = sim.getJointPosition(endEffector).T[0] 
-    points = np.array([left_arm_pos, path3])
-    sim.selfDockingToPosition(points, endEffector)
 
     # TODO: Add your code hereorientation
     
