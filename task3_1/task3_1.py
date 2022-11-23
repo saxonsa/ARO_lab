@@ -133,9 +133,9 @@ def solution():
         },
         {
             'left': 'LARM_JOINT5',
-            'leftTargetPosition': [0.591, 0.0417, 0.9265],
+            'leftTargetPosition': [0.594, 0.0415, 0.9265],
             'right': 'RARM_JOINT5',
-            'rightTargetPosition': [0.591, -0.0417, 0.9265],
+            'rightTargetPosition': [0.594, -0.0415, 0.9265], # 594 0415 9265
             'iterNum': 32
         },
     ]
@@ -144,9 +144,9 @@ def solution():
         sim.selfDockingToPosition(leftEndEffector=path['left'], leftTargetPosition=path['leftTargetPosition'], rightEndEffector=path['right'], rightTargetPosition=path['rightTargetPosition'], iterNum=path['iterNum'])
     
     # test current position: 0.01973340798318625
-    # cubic_position = sim.p.getBasePositionAndOrientation(cubeId)[0]
-    # target_position = sim.p.getBasePositionAndOrientation(targetId)[0]
-    # print('distance', np.linalg.norm(np.asarray(cubic_position) - np.asarray(target_position)))
+    cubic_position = sim.p.getBasePositionAndOrientation(cubeId)[0]
+    target_position = sim.p.getBasePositionAndOrientation(targetId)[0]
+    print('distance', np.linalg.norm(np.asarray(cubic_position) - np.asarray(target_position)))
 
 tableId, cubeId, targetId = getReadyForTask()
 
