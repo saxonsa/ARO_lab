@@ -741,7 +741,7 @@ kukaId
         iterNum = 20
         eff_pos = self.getJointPosition(jointName=endEffector).T[0]  # dim: 1 * 3
         eff_orientation = self.getJointOrientation(jointName=endEffector) # dim: 1 * 3
-        eff_config = np.concatenate((eff_pos, eff_orientation), axis=0)
+
         self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition[0:3]))
         self.plot_time_dp.append(time.process_time())
 

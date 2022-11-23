@@ -100,65 +100,46 @@ def getReadyForTask():
 
 
 def solution():
-
+    
+    # lift it up
     paths = [
         {
             'left': 'LARM_JOINT5',
-            'leftTargetPosition': np.array([0.45, 0.015, 1.08]),
-            'leftOrientation': np.array([0.98, 0, 1]),
+            'leftTargetPosition': np.array([0.50497461, 0.23, 1.05]),
+            'leftOrientation': None,
             'right': 'RARM_JOINT5',
-            'rightTargetPosition': np.array([0.45, -0.015, 1.08]),
-            'rightOrientation': np.array([0.98, 0, 1]),
-            'iterNum': 50
+            'rightTargetPosition': np.array([0.50497461, -0.23, 1.05]),
+            'rightOrientation': None,
+            'iterNum': 10
         },
         {
             'left': 'LARM_JOINT5',
-            'leftTargetPosition': np.array([0.45, 0.1, 1.11]),
-            'leftOrientation': np.array([0.99, 0, 1.1]),
+            'leftTargetPosition': np.array([0.43, 0.23, 1.05]),
+            'leftOrientation': None,
             'right': 'RARM_JOINT5',
-            'rightTargetPosition': np.array([0.45, -0.1, 1.11]),
-            'rightOrientation': np.array([0.99, 0, 1.1]),
-            'iterNum': 25
+            'rightTargetPosition': np.array([0.43, -0.23, 1.05]),
+            'rightOrientation': None,
+            'iterNum': 10
         },
         {
             'left': 'LARM_JOINT5',
-            'leftTargetPosition': np.array([0.45, 0.5, 1.11]),
-            'leftOrientation': np.array([0.99, 0, 1.1]),
+            'leftTargetPosition': np.array([0.43, 0.08, 1.05]),
+            'leftOrientation': np.array([1, 0, 1]),
             'right': 'RARM_JOINT5',
-            'rightTargetPosition': np.array([0.45, 0.3, 1.11]),
-            'rightOrientation': np.array([0.99, 0, 1.1]),
-            'iterNum': 25
+            'rightTargetPosition': np.array([0.43, -0.08, 1.05]),
+            'rightOrientation': np.array([1, 0, 1]),
+            'iterNum': 10
         },
-        # {
-        #     'left': 'LARM_JOINT5',
-        #     'leftTargetPosition': np.array([0.45, 0.015, 1.1]),
-        #     'leftOrientation': np.array([0.99, 0, 1.00]),
-        #     'right': 'RARM_JOINT5',
-        #     'rightTargetPosition': np.array([0.45, -0.015, 1.1]),
-        #     'rightOrientation': np.array([0.99, 0, 1.00]),
-        #     'iterNum': 25
-        # },
-        # {
-        #     'left': 'LARM_JOINT5',
-        #     'leftTargetPosition': np.array([0.45, 0.015, 1.10]),
-        #     'leftOrientation': np.array([0.98, 0, 0.96]),
-        #     'right': 'RARM_JOINT5',
-        #     'rightTargetPosition': np.array([0.45, -0.02, 1.10]),
-        #     'rightOrientation': np.array([0.98, 0, 0.96]),
-        #     'iterNum': 25
-        # },
-        # {
-        #     'left': 'LARM_JOINT5',
-        #     'leftTargetPosition': np.array([0.45, 0.015, 1.15]),
-        #     'leftOrientation': np.array([0.98, 0, 0.96]),
-        #     'right': 'RARM_JOINT5',
-        #     'rightTargetPosition': np.array([0.45, -0.02, 1.15]),
-        #     'rightOrientation': np.array([0.98, 0, 0.96]),
-        #     'iterNum': 25
-        # },
-
+        {
+            'left': 'LARM_JOINT5',
+            'leftTargetPosition': np.array([0.43, 0.08, 1.18]),
+            'leftOrientation': None,
+            'right': 'RARM_JOINT5',
+            'rightTargetPosition': np.array([0.43, -0.08, 1.18]),
+            'rightOrientation': None,
+            'iterNum': 20
+        },
     ]
-
     for path in paths:
         sim.clamp(leftEndEffector=path['left'], leftTargetPosition=path['leftTargetPosition'], leftOrientation=path['leftOrientation'], rightEndEffector=path['right'], rightTargetPosition=path['rightTargetPosition'], rightOrientation=path['rightOrientation'], iterNum=path['iterNum'])
 
