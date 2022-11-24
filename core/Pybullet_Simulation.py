@@ -876,7 +876,7 @@ kukaId
         return new_x_real
 
     ########## Task 3: Robot Manipulation ##########
-    def cubic_interpolation(self, points, nTimes=100):
+    def cubic_interpolation(self, points, gap=0.01):
         """
         Given a set of control points, return the
         cubic spline defined by the control points,
@@ -889,12 +889,24 @@ kukaId
 
         # points = [start, target]
 
-        point_num = len(points)
-        cs = CubicSpline(range(point_num), points, bc_type='natural')
-        point_gap = (point_num - 1) / nTimes
+        # point_num = len(points)
+        # cs = CubicSpline(range(point_num), points, bc_type='natural')
+        # point_gap = (point_num - 1) / nTimes
 
-        xs = np.arange(0, (point_num - 1) + point_gap, point_gap)
-        return cs(xs)
+        # xs = np.arange(0, (point_num - 1) + point_gap, point_gap)
+        x = np.array([])
+        y = np.array([])
+        for point in points:
+            x = np.append(x, point[0])
+            y = np.append(y, point[1])
+        if (x[0] > x[1]):
+            x = np.flip(x)
+            y = np.flip(y)
+        cs = CubicSpline(x, y)
+        xs = np.arange(x[0], x[len(points)-1], gap)
+
+
+        return xs, cs(xs)
 
         #return xpoints, ypoints
 
