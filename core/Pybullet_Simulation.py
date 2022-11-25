@@ -226,31 +226,45 @@ kukaId
         return np.array(self.getJointLocationAndOrientation(jointName)[1] @ self.jointRotationAxis[jointName]).squeeze()
 
     def jacobianMatrix(self, endEffector):
-        """Calculate the Jacobian Matrix for the Nextage Robot."""
-        # TODO modify from here
-        # You can implement the cross product yourself or use calculateJacobian().
-        # Hint: you should return a numpy array for your Jacobian matrix. The
-        # size of the matrix will depend on your chosen convention. You can have
-        # a 3xn or a 6xn Jacobian matrix, where 'n' is the number of joints in
-        # your kinematic chain.
-
+    
         J = []  # 3 * n
         joint_chain = self.chain_dict[endEffector]
         pos_eff = self.getJointPosition(endEffector).T[0]
-
-        for jointName in joint_chain:
-            if jointName == endEffector:
-                rotationAxis = self.jointRotationAxis[jointName]
-                J.append(np.cross(rotationAxis, pos_eff))
-                # J.append(np.cross(rotationAxis, [0, 0, 0]))
+        
+        for jointName, _ in self.frameTranslationFromParent.items():
+            if jointName in self.ignore_joints:
                 continue
-            rotationAxis = self.jointRotationAxis[jointName]  # dim: 1 * 3
-            jointPos = self.getJointPosition(jointName).T[0]  # pos, dim: 1 * 3, ([a, b, c])
-            J.append(np.cross(rotationAxis, (pos_eff - jointPos)))
+            elif jointName not in joint_chain:
+                J.append(np.array([0, 0, 0]))
+            else:
+                rotationalAxis = self.getJointLocationAndOrientation(jointName)[1]
+                ai = rotationalAxis.dot(self.jointRotationAxis[jointName])  # dim: 1 * 3
+                jointPos = self.getJointPosition(jointName).T[0]  # pos, dim: 1 * 3, ([a, b, c])
+                J.append(np.cross(ai, (pos_eff - jointPos)))
 
         J = np.array(J).T
 
-        return J
+        J_O = []
+
+        for jointName, _ in self.frameTranslationFromParent.items():
+            if jointName in self.ignore_joints:
+                continue
+            elif jointName not in joint_chain:
+                J_O.append(np.array([0, 0, 0]))
+            else:
+                # rotationalAxis = self.getJointLocationAndOrientation(jointName=jointName)[1].dot(self.jointRotationAxis[jointName])
+                # a_effector = self.getJointLocationAndOrientation(jointName=endEffector)[1].dot(self.jointRotationAxis[endEffector])
+                # jointOrientation = np.cross(rotationalAxis, a_effector)
+                ai = self.jointRotationAxis[jointName]
+                a_eff = self.jointRotationAxis[endEffector]
+                jointOrientation = np.cross(ai, a_eff)
+                J_O.append(jointOrientation)
+        
+        J_O = np.array(J_O).T
+
+        J_6_dim = np.concatenate((J, J_O), axis=0)
+
+        return J_6_dim
 
     def jacobianMatrix6(self, endEffector):
         
@@ -523,84 +537,6 @@ kukaId
 
         return pltTime, pltTarget, pltTorque, pltTorqueTime, pltPosition, pltVelocity
 
-    def move_with_PD(self, endEffector, targetPosition=None, path=None, speed=0.01, orientation=None,
-        threshold=1e-3, maxIter=100, debug=False, verbose=False):
-        """
-        Move joints using inverse kinematics solver and using PD control.
-        This method should update joint states using the torque output from the PD controller.
-        Return:
-            pltTime, pltDistance arrays used for plotting
-        """
-        #TODO add your code here
-        # Iterate through joints and use states from IK solver as reference states in PD controller.
-        # Perform iterations to track reference states using PD controller until reaching
-        # max iterations or position threshold.
-
-        # Hint: here you can add extra steps if you want to allow your PD
-        # controller to converge to the final target position after performing
-        # all IK iterations (optional).
-
-        #initial parameters
-        iterNum = 100
-        eff_pos = self.getJointPosition(jointName=endEffector).T[0]  # dim: 3 * 1
-        self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition))
-        self.plot_time_dp.append(time.process_time())
-
-        # inverse kinematics
-        current_q = []
-
-        for joint_name in self.chain_dict[endEffector]:
-            if joint_name == 'RHAND' or joint_name == 'LHAND':
-                continue
-            joint_angle = self.getJointPos(jointName=joint_name) 
-            current_q.append(joint_angle)
-
-        step_positions = np.linspace(start=eff_pos, stop=targetPosition, num=iterNum)
-
-        if path is not None:
-            step_positions = path
-            iterNum = len(path)
-        
-        old_x_real = list()
-
-        for step in range(1, iterNum):
-            current_target = step_positions[step]
-
-            dy = current_target - eff_pos
-            J = self.jacobianMatrix(endEffector)
-            d_theta = np.linalg.pinv(J).dot(dy)
-
-            # last_q = current_q
-            current_q += d_theta
-
-            # moving by DP
-            new_x_real = list()
-            # for _ in range(200):
-            #     if len(new_x_real) == 0:
-            #         old_x_real = current_q
-            #     else:
-            #         old_x_real = new_x_real
-            if len(new_x_real) == 0:
-                old_x_real = current_q
-            else:
-                old_x_real = new_x_real
-            new_x_real = self.tick(endEffector, current_q, old_x_real)
-
-            # check the position of effector after moving with PD
-            eff_pos = self.getJointPosition(jointName=endEffector).T[0]
-
-            # print(np.linalg.norm(eff_pos - current_target))
-            print(np.linalg.norm(eff_pos - targetPosition))
-
-            self.plot_distance_dp.append(np.linalg.norm(eff_pos - targetPosition))
-            self.plot_time_dp.append(time.process_time())
-
-            if np.linalg.norm(eff_pos - targetPosition) < threshold:
-                print('stop')
-                break
-
-        return np.array(self.plot_time_dp), np.array(self.plot_distance_dp)
-    
     def move_with_PD_dual_joint(self, leftEndEffector, leftTargetPosition, leftOrientation=None, rightEndEffector=None, rightTargetPosition=None, \
             rightOrientation=None, speed=0.01, threshold=1e-3, maxIter=100, debug=False, verbose=False, iterNum=25):
 
@@ -716,6 +652,152 @@ kukaId
                 if np.linalg.norm(eff_left_pos - leftTargetPosition) < threshold:
                     print('stop')
                     break
+
+        return plot_left_distance, plot_right_distance, plot_time
+
+    def move_with_PD_dual_joint_plus_orientation(self, leftEndEffector, leftTargetPosition, leftOrientation=None, rightEndEffector=None, rightTargetPosition=None, \
+            rightOrientation=None, speed=0.01, threshold=1e-3, maxIter=100, debug=False, verbose=False, iterNum=25):
+
+        # initial left config
+        eff_left_pos = self.getJointPosition(jointName=leftEndEffector).T[0]
+        eff_left_orientation = self.getJointOrientation(jointName=leftEndEffector)
+        eff_left_config = eff_left_pos
+        left_compose_target_pos = leftTargetPosition
+        if leftOrientation is not None:
+            eff_left_config = np.concatenate((eff_left_pos, eff_left_orientation), axis=0)
+            left_compose_target_pos = np.concatenate((leftTargetPosition, leftOrientation), axis=0)
+
+        # initial right config
+        if rightEndEffector is not None:
+            eff_right_pos = self.getJointPosition(jointName=rightEndEffector).T[0]
+            eff_right_orientation = self.getJointOrientation(jointName=rightEndEffector)
+            eff_right_config = eff_right_pos
+            right_compose_target_pos = rightTargetPosition
+            if rightOrientation is not None:
+                eff_right_config = np.concatenate((eff_right_pos, eff_right_orientation), axis=0)
+                right_compose_target_pos = np.concatenate((rightTargetPosition, rightOrientation), axis=0)
+
+        # plot
+        plot_left_distance, plot_right_distance, plot_time = [], [], []
+
+        # initialize current_q
+        left_current_q, right_current_q = list(), list()
+        total_current_q = []
+
+        for joint_name, _ in self.frameTranslationFromParent.items():
+            if joint_name not in self.ignore_joints:
+                joint_angle = self.getJointPos(jointName=joint_name)
+                left_current_q.append(joint_angle)
+                right_current_q.append(joint_angle)
+                total_current_q.append(joint_angle)
+
+        left_step_positions = np.linspace(start=eff_left_config, stop=left_compose_target_pos, num=iterNum)
+
+        if rightEndEffector is not None:
+            right_step_positions = np.linspace(start=eff_right_config, stop=right_compose_target_pos, num=iterNum)
+
+        total_new_x_real, total_old_x_real = [], []
+
+        for step in range(1, iterNum):
+            print('current Orientatoin', self.getJointOrientation(leftEndEffector))
+            print('left', self.getJointPosition('LARM_JOINT5').T[0])
+            left_current_target = left_step_positions[step]
+
+            if rightEndEffector is not None:
+                right_current_target = right_step_positions[step]
+
+            dy_left = left_current_target - eff_left_config
+            if leftOrientation is not None:
+                J_left = self.jacobianMatrix6(leftEndEffector)
+            else:
+                J_left = self.jacobianMatrix6(leftEndEffector)[:3]
+            d_theta_left = np.linalg.pinv(J_left).dot(dy_left)
+            left_current_q = left_current_q + d_theta_left
+            total_current_q = total_current_q + d_theta_left
+
+            if rightEndEffector is not None:
+                dy_right = right_current_target - eff_right_config
+                if rightOrientation is not None:
+                    J_right = self.jacobianMatrix6(rightEndEffector)
+                else:
+                    J_right = self.jacobianMatrix6(rightEndEffector)[:3]
+                d_theta_right = np.linalg.pinv(J_right).dot(dy_right)
+                right_current_q = right_current_q + d_theta_right
+                total_current_q = total_current_q + d_theta_right
+
+            for _ in range(100):
+                if len(total_new_x_real) == 0:
+                    total_old_x_real = total_current_q
+                else:
+                    total_old_x_real = total_new_x_real
+
+                total_new_x_real = self.tick(total_current_q, total_old_x_real)
+            
+            # check the position of effector after moving with PD
+            eff_left_pos = self.getJointPosition(jointName=leftEndEffector).T[0]
+            if leftOrientation is not None:
+                eff_left_orientation = self.getJointOrientation(jointName=leftEndEffector)
+                eff_left_config = np.concatenate((eff_left_pos, eff_left_orientation), axis=0)
+            else:
+                eff_left_config = eff_left_pos
+
+            if rightEndEffector is not None:
+                eff_right_pos = self.getJointPosition(jointName=rightEndEffector).T[0]
+                if rightOrientation is not None:
+                    eff_right_orientation = self.getJointOrientation(jointName=rightEndEffector)
+                    eff_right_config = np.concatenate((eff_right_pos, eff_right_orientation), axis=0)
+                else:
+                    eff_right_config = eff_right_pos
+
+            # print(np.linalg.norm(eff_pos - current_target))
+            # print('left hand', np.linalg.norm(eff_left_pos - leftTargetPosition))
+            # if rightEndEffector is not None:
+            #     print('right hand', np.linalg.norm(eff_right_pos - rightTargetPosition))
+
+            plot_left_distance.append(np.linalg.norm(eff_left_pos - leftTargetPosition))
+            if rightEndEffector is not None:
+                plot_right_distance.append(np.linalg.norm(eff_right_pos - rightTargetPosition))
+            plot_time.append(time.process_time())
+
+
+            # stop control
+            if rightEndEffector is None:
+                if leftOrientation is None:
+                    if np.linalg.norm(eff_left_pos - leftTargetPosition) < threshold:
+                        print('stop')
+                        break
+                else:
+                    if np.linalg.norm(eff_left_pos - leftTargetPosition) < threshold and \
+                            np.linalg.norm(eff_left_orientation - leftOrientation) < threshold:
+                        print('stop')
+                        break
+            else:
+                if rightOrientation is None:
+                    if leftOrientation is None:
+                        if np.linalg.norm(eff_left_pos - leftTargetPosition) < threshold and \
+                            np.linalg.norm(eff_right_pos - rightTargetPosition) < threshold:
+                            print('stop')
+                            break
+                    else:
+                        if np.linalg.norm(eff_left_pos - leftTargetPosition) < threshold and \
+                            np.linalg.norm(eff_right_pos - rightTargetPosition) < threshold and \
+                                np.linalg.norm(eff_left_orientation - leftOrientation) < threshold:
+                                print('stop')
+                                break
+                else:
+                    if leftOrientation is None:
+                        if np.linalg.norm(eff_left_pos - leftTargetPosition) < threshold and \
+                            np.linalg.norm(eff_right_pos - rightTargetPosition) < threshold and \
+                                np.linalg.norm(eff_right_orientation - rightOrientation) < threshold:
+                                print('stop')
+                                break
+                    else:
+                        if np.linalg.norm(eff_left_pos - leftTargetPosition) < threshold and \
+                            np.linalg.norm(eff_right_pos - rightTargetPosition) < threshold and \
+                                np.linalg.norm(eff_right_orientation - rightOrientation) < threshold and \
+                                    np.linalg.norm(eff_left_orientation - leftOrientation) < threshold:
+                                print('stop')
+                                break
 
         return plot_left_distance, plot_right_distance, plot_time
 
@@ -937,7 +1019,7 @@ kukaId
     def clamp(self, leftEndEffector, leftTargetPosition, leftOrientation=None, rightEndEffector=None, rightTargetPosition=None, \
             rightOrientation=None, speed=0.01, threshold=1e-3, maxIter=100, debug=False, verbose=False, iterNum=25):
         """A template function for you, you are free to use anything else"""
-        self.move_with_PD_dual_joint(leftEndEffector, leftTargetPosition, leftOrientation=leftOrientation, rightEndEffector=rightEndEffector, rightTargetPosition=rightTargetPosition, rightOrientation=rightOrientation, \
+        self.move_with_PD_dual_joint_plus_orientation(leftEndEffector, leftTargetPosition, leftOrientation=leftOrientation, rightEndEffector=rightEndEffector, rightTargetPosition=rightTargetPosition, rightOrientation=rightOrientation, \
             threshold=1e-3, iterNum=iterNum)
 
  ### END
