@@ -144,54 +144,97 @@ def solution():
     for path in paths:
         sim.clamp(leftEndEffector=path['left'], leftTargetPosition=path['leftTargetPosition'], leftOrientation=path['leftOrientation'], rightEndEffector=path['right'], rightTargetPosition=path['rightTargetPosition'], rightOrientation=path['rightOrientation'], iterNum=path['iterNum'])
 
-    # twist
     currentLeftPosition = sim.getJointPosition(jointName='LARM_JOINT5').T[0][:2]
     currentRightPosition = sim.getJointPosition(jointName='RARM_JOINT5').T[0][:2]
     targetPosition = finalTargetPos[:2]
-    obstaclePosition = np.array([0.40,0.275,0.9][:2]) # np.add(obstaclePosition, np.array([-0.03, 0.02])) 
-    left_points = [currentLeftPosition, np.add(obstaclePosition, np.array([-0.03, 0.02])), np.add(targetPosition, np.array([-0.03, 0.02]))]
-    right_points = [currentRightPosition, np.add(obstaclePosition, np.array([-0.05, 0.18])), np.add(targetPosition, np.array([-0.05, 0.18]))]
-    xs_left, y_left = sim.cubic_interpolation(left_points, gap=0.02)
-    xs_right, y_right = sim.cubic_interpolation(right_points, gap=0.02)
+    obstaclePosition = np.array([0.43,0.275,0.9][:2]) # np.add(obstaclePosition, np.array([-0.03, 0.02])) 
+    left_points = [currentLeftPosition, np.add(obstaclePosition, np.array([0, 0])), np.add(targetPosition, np.array([-0.03, 0.02]))]
+    right_points = [currentRightPosition, np.add(obstaclePosition, np.array([0, 0.26])), np.add(targetPosition, np.array([0, 0.26]))]
+    y_left, x_left = sim.cubic_interpolation(left_points, gap=0.04)
+    y_right, x_right = sim.cubic_interpolation(right_points, gap=0.04)
 
-    xs_left = np.flip(xs_left)
-    y_left = np.flip(y_left)
-
-    xs_right = np.flip(xs_right)    
-    y_right = np.flip(y_right)
 
     paths_twist_1 = []
-    for num in range(2):
+    for num in range(len(y_left-3)):
+        # paths_twist_1.append(
+        #     {
+        #         'left': 'LARM_JOINT5',
+        #         'leftTargetPosition': np.array(np.add(np.array([x_left[num], y_left[num], 1.18]), np.array([0.01, -0.02, -0.01]))),
+        #         'leftOrientation': None,
+        #         'right': 'RARM_JOINT5',
+        #         'rightTargetPosition': np.array(np.add(np.array([x_right[num], y_right[num], 1.18]), np.array([-0.10, 0.10, -0.01]))),
+        #         'rightOrientation': None,
+        #         'iterNum': 5
+        #     }
+        # )
         paths_twist_1.append(
             {
                 'left': 'LARM_JOINT5',
-                'leftTargetPosition': np.array(np.add(np.array([xs_left[num], y_left[num], 1.18]), np.array([0.01, -0.02, -0.01]))),
-                'leftOrientation': np.array([0.9, 0, 0]),
+                'leftTargetPosition': np.array(np.add(np.array([x_left[num], y_left[num], 1.18]), np.array([0, 0, 0]))),
+                'leftOrientation': None,
                 'right': 'RARM_JOINT5',
-                'rightTargetPosition': np.array(np.add(np.array([xs_right[num], y_right[num], 1.18]), np.array([0.01, 0.03, -0.01]))),
-                'rightOrientation': np.array([0.9, 0, 0]),
-                'iterNum': 20
+                'rightTargetPosition': np.array(np.add(np.array([x_right[num], y_right[num], 1.18]), np.array([0, 0, 0]))),
+                'rightOrientation': None,
+                'iterNum': 8
             }
         )
 
+    i = 0
     for path in paths_twist_1:
+        i += 1
+        print('i', i)
         sim.clamp(leftEndEffector=path['left'], leftTargetPosition=path['leftTargetPosition'], leftOrientation=path['leftOrientation'], rightEndEffector=path['right'], rightTargetPosition=path['rightTargetPosition'], rightOrientation=path['rightOrientation'], iterNum=path['iterNum'])
         print(sim.getJointPosition(jointName='LARM_JOINT5').T[0][:2])
         print(sim.getJointPosition(jointName='RARM_JOINT5').T[0][:2])
 
-    path_forward = [
-        {
-            'left': 'LARM_JOINT5',
-            'leftTargetPosition': np.array([0.50, 0.08, 1.18]),
-            'leftOrientation': None,
-            'right': 'RARM_JOINT5',
-            'rightTargetPosition': np.array([0.50, -0.08, 1.18]),
-            'rightOrientation': None,
-            'iterNum': 10
-        },
-    ]
-    for path in path_forward:
-        sim.clamp(leftEndEffector=path['left'], leftTargetPosition=path['leftTargetPosition'], leftOrientation=path['leftOrientation'], rightEndEffector=path['right'], rightTargetPosition=path['rightTargetPosition'], rightOrientation=path['rightOrientation'], iterNum=path['iterNum'])
+    # twist
+    # currentLeftPosition = sim.getJointPosition(jointName='LARM_JOINT5').T[0][:2]
+    # currentRightPosition = sim.getJointPosition(jointName='RARM_JOINT5').T[0][:2]
+    # targetPosition = finalTargetPos[:2]
+    # obstaclePosition = np.array([0.40,0.275,0.9][:2]) # np.add(obstaclePosition, np.array([-0.03, 0.02])) 
+    # left_points = [currentLeftPosition, np.add(obstaclePosition, np.array([-0.03, 0.02])), np.add(targetPosition, np.array([-0.03, 0.02]))]
+    # right_points = [currentRightPosition, np.add(obstaclePosition, np.array([-0.05, 0.18])), np.add(targetPosition, np.array([-0.05, 0.18]))]
+    # xs_left, y_left = sim.cubic_interpolation(left_points, gap=0.02)
+    # xs_right, y_right = sim.cubic_interpolation(right_points, gap=0.02)
+
+    # xs_left = np.flip(xs_left)
+    # y_left = np.flip(y_left)
+
+    # xs_right = np.flip(xs_right)    
+    # y_right = np.flip(y_right)
+
+    # paths_twist_1 = []
+    # for num in range(2):
+    #     paths_twist_1.append(
+    #         {
+    #             'left': 'LARM_JOINT5',
+    #             'leftTargetPosition': np.array(np.add(np.array([xs_left[num], y_left[num], 1.18]), np.array([0.01, -0.02, -0.01]))),
+    #             'leftOrientation': None,
+    #             'right': 'RARM_JOINT5',
+    #             'rightTargetPosition': np.array(np.add(np.array([xs_right[num], y_right[num], 1.18]), np.array([0.01, 0.03, -0.01]))),
+    #             'rightOrientation': None,
+    #             'iterNum': 20
+    #         }
+    #     )
+
+    # for path in paths_twist_1:
+    #     sim.clamp(leftEndEffector=path['left'], leftTargetPosition=path['leftTargetPosition'], leftOrientation=path['leftOrientation'], rightEndEffector=path['right'], rightTargetPosition=path['rightTargetPosition'], rightOrientation=path['rightOrientation'], iterNum=path['iterNum'])
+    #     print(sim.getJointPosition(jointName='LARM_JOINT5').T[0][:2])
+    #     print(sim.getJointPosition(jointName='RARM_JOINT5').T[0][:2])
+
+    # path_forward = [
+    #     {
+    #         'left': 'LARM_JOINT5',
+    #         'leftTargetPosition': np.array([0.50, 0.08, 1.18]),
+    #         'leftOrientation': None,
+    #         'right': 'RARM_JOINT5',
+    #         'rightTargetPosition': np.array([0.50, -0.08, 1.18]),
+    #         'rightOrientation': None,
+    #         'iterNum': 10
+    #     },
+    # ]
+    # for path in path_forward:
+    #     sim.clamp(leftEndEffector=path['left'], leftTargetPosition=path['leftTargetPosition'], leftOrientation=path['leftOrientation'], rightEndEffector=path['right'], rightTargetPosition=path['rightTargetPosition'], rightOrientation=path['rightOrientation'], iterNum=path['iterNum'])
 
     # Interpolate the path through cubic spline function
     # currentLeftPosition = sim.getJointPosition(jointName='LARM_JOINT5').T[0][:2]

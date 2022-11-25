@@ -976,21 +976,27 @@ kukaId
         # point_gap = (point_num - 1) / nTimes
 
         # xs = np.arange(0, (point_num - 1) + point_gap, point_gap)
+
         x = np.array([])
         y = np.array([])
         for point in points:
             x = np.append(x, point[0])
             y = np.append(y, point[1])
-        if (x[0] > x[1]):
-            x = np.flip(x)
-            y = np.flip(y)
-        cs = CubicSpline(x, y)
-        xs = np.arange(x[0], x[len(points)-1], gap)
+        
+        print('y', y)
+        print('x', x)
+        # if (x[0] > x[1]):
+        #     x = np.flip(x)
+        #     y = np.flip(y)
 
-
+        cs = CubicSpline(y, x)
+        xs = np.arange(y[0], y[len(points)-1], gap)
         return xs, cs(xs)
 
         #return xpoints, ypoints
+    
+    # def path_interpolation(self, points, gap=0.01):
+        
 
     # Task 3.1 Pushing
     # def dockingToPosition(self, leftTargetAngle, rightTargetAngle, angularSpeed=0.005,
